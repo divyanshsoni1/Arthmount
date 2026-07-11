@@ -1,0 +1,1008 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  OTHER
+}
+
+enum InvestmentStatus {
+  ACTIVE
+  MATURED
+  CANCELLED
+  WITHDRAWN
+}
+
+enum ProfitStatus {
+  PENDING
+  CREDITED
+  CANCELLED
+}
+
+enum CommissionType {
+  UPFRONT
+  WEEKLY
+  REFERRAL
+  BONUS
+  PERFORMANCE
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  CREDITED
+  PAID
+  REJECTED
+  CANCELLED
+}
+
+enum WithdrawalMethod {
+  BANK
+  UPI
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+  CANCELLED
+}
+
+enum DepositMethod {
+  UPI
+  BANK_TRANSFER
+  CARD
+  NET_BANKING
+  WALLET
+  CRYPTO
+}
+
+enum DepositStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REJECTED
+  CANCELLED
+}
+
+enum LedgerTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  PROFIT
+  COMMISSION
+  BONUS
+  REFUND
+  PENALTY
+  ADJUSTMENT
+  TRANSFER
+}
+
+enum LedgerEntryType {
+  CREDIT
+  DEBIT
+}
+
+enum ReferenceType {
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  WEEKLY_PROFIT
+  AGENT_COMMISSION
+  ADMIN_ADJUSTMENT
+  SYSTEM
+}
+
+enum KycProvider {
+  MANUAL
+  CASHFREE
+  SIGNZY
+  DIGIO
+  HYPERVERGE
+}
+
+enum KycStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  AUTO_APPROVED
+}
+
+enum NotificationType {
+  SYSTEM
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  PROFIT
+  COMMISSION
+  KYC
+  SECURITY
+  PROMOTION
+  ANNOUNCEMENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum ConsentType {
+  TERMS_AND_CONDITIONS
+  PRIVACY_POLICY
+  KYC_CONSENT
+  INVESTMENT_AGREEMENT
+  RISK_DISCLOSURE
+  AML_POLICY
+  MARKETING
+  EMAIL_COMMUNICATION
+  SMS_COMMUNICATION
+}
+
+enum GatewayMode {
+  SANDBOX
+  LIVE
+}
+
+enum HolidayType {
+  NATIONAL
+  BANK
+  MARKET
+  WEEKEND
+  SPECIAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  ENABLE
+  DISABLE
+  RESET_PASSWORD
+  RESET_PIN
+}
+
+enum AuditResource {
+  USER
+  KYC
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  PACKAGE
+  PAYMENT_GATEWAY
+  OTP_PROVIDER
+  SMTP
+  SYSTEM_SETTING
+  NOTIFICATION
+  ADMIN
+}
+
+enum AuditStatus {
+  SUCCESS
+  FAILED
+}
+
+enum TicketCategory {
+  ACCOUNT
+  KYC
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT
+  PAYMENT
+  COMMISSION
+  SECURITY
+  BUG
+  FEATURE_REQUEST
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum Role {
+  USER
+  AGENT
+  ADMIN
+  SUPER_ADMIN
+  SUPPORT
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Identity
+  name               String  @db.VarChar(100)
+  email              String? @unique @db.VarChar(255)
+  phone              String? @unique @db.VarChar(20)
+  passwordHash       String?
+  loginPinHash       String?
+  transactionPinHash String?
+
+  // Profile
+  dob           DateTime?      @db.Date
+  gender        Gender?
+  maritalStatus MaritalStatus?
+
+  // KYC
+  panNumber         String?   @unique @db.VarChar(10)
+  kycVerified       Boolean   @default(false)
+  kycStatus         KycStatus @default(PENDING)
+  kycRejectedReason String?
+
+  // Wallet
+  mainBalance       Decimal @default(0.00) @db.Decimal(18, 2)
+  investedBalance   Decimal @default(0.00) @db.Decimal(18, 2)
+  commissionBalance Decimal @default(0.00) @db.Decimal(18, 2)
+
+  // Agent System
+  agentCode String? @unique @db.VarChar(30)
+
+  referredById String? @db.Uuid
+
+  referredBy User?  @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals  User[] @relation("UserReferrals")
+
+  // Security
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  isFrozen         Boolean   @default(false)
+  sessionRevokedAt DateTime?
+  lastLoginAt      DateTime?
+
+  // Roles
+  role Role @default(USER)
+
+  // Audit
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  investments               Investment[]
+  withdrawals               Withdrawal[]
+  approvedWithdrawals       Withdrawal[]               @relation("ApprovedWithdrawals")
+  depositRequests           DepositRequest[]
+  reviewedDeposits          DepositRequest[]           @relation("ReviewedDeposits")
+  ledgerEntries             Ledger[]
+  kycDocument               KycDocument?
+  reviewedKycDocuments      KycDocument[]              @relation("ReviewedKyc")
+  notifications             Notification[]
+  devices                   UserDevice[]
+  consents                  UserConsent[]
+  weeklyProfitAccumulations WeeklyProfitAccumulation[]
+  earnedCommissions         AgentCommission[]          @relation("AgentCommissions")
+  generatedCommissions      AgentCommission[]          @relation("ClientCommissions")
+  supportTickets            SupportTicket[]
+  assignedSupportTickets    SupportTicket[]            @relation("AssignedSupportTickets")
+  adminAuditLogs            AdminAuditLog[]            @relation("AdminAuditLogs")
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([agentCode])
+  @@index([kycStatus])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Package {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Basic Information
+  name        String  @unique @db.VarChar(100)
+  code        String  @unique @db.VarChar(30)
+  description String? @db.Text
+
+  // Investment Limits
+  minAmount Decimal @db.Decimal(18, 2)
+  maxAmount Decimal @db.Decimal(18, 2)
+
+  // Profit Configuration
+  dailyReturnRate Decimal @db.Decimal(8, 4)
+
+  // Duration
+  tenureDays Int
+
+  // Business Rules
+  maxInvestmentsPerUser    Int?
+  allowMultipleInvestments Boolean @default(true)
+
+  // Status
+  isActive  Boolean @default(true)
+  isVisible Boolean @default(true)
+  isDeleted Boolean @default(false)
+
+  // Display
+  displayOrder Int @default(0)
+
+  // Audit
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  investments Investment[]
+
+  @@index([isActive])
+  @@index([isVisible])
+  @@index([displayOrder])
+  @@index([createdAt])
+  @@map("packages")
+}
+
+model Investment {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Relations
+  userId    String @db.Uuid
+  packageId String @db.Uuid
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  package Package @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  // Investment Details
+  principalAmount Decimal @db.Decimal(18, 2)
+
+  // Snapshot of package at investment time
+  dailyReturnRate Decimal @db.Decimal(8, 4)
+  tenureDays      Int
+
+  // Progress Tracking
+  completedDays Int @default(0)
+
+  // Earnings
+  totalProfitEarned Decimal @default(0.00) @db.Decimal(18, 2)
+  totalProfitPaid   Decimal @default(0.00) @db.Decimal(18, 2)
+  pendingProfit     Decimal @default(0.00) @db.Decimal(18, 2)
+
+  // Important Dates
+  investedAt     DateTime  @default(now())
+  maturityDate   DateTime
+  lastProfitDate DateTime?
+
+  // Status
+  status InvestmentStatus @default(ACTIVE)
+
+  // Optional Notes
+  remarks String? @db.Text
+
+  // Audit
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  weeklyProfitAccumulations WeeklyProfitAccumulation[]
+  commissions               AgentCommission[]
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([status])
+  @@index([investedAt])
+  @@index([maturityDate])
+  @@index([createdAt])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("investments")
+}
+
+model WeeklyProfitAccumulation {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Relations
+  userId       String @db.Uuid
+  investmentId String @db.Uuid
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  investment Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
+
+  // Profit Details
+  grossProfit Decimal @db.Decimal(18, 2)
+  taxAmount   Decimal @default(0.00) @db.Decimal(18, 2)
+  feeAmount   Decimal @default(0.00) @db.Decimal(18, 2)
+  netProfit   Decimal @db.Decimal(18, 2)
+
+  // Profit Date
+  profitDate DateTime @db.Date
+
+  // Week Information
+  weekNumber Int
+  year       Int
+
+  // Payment Status
+  status ProfitStatus @default(PENDING)
+
+  creditedAt DateTime?
+  remarks    String?   @db.Text
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([investmentId, profitDate])
+  @@index([userId])
+  @@index([investmentId])
+  @@index([status])
+  @@index([profitDate])
+  @@index([weekNumber, year])
+  @@index([userId, status])
+  @@index([investmentId, profitDate])
+  @@map("weekly_profit_accumulations")
+}
+
+model AgentCommission {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Relations
+  agentId      String  @db.Uuid
+  clientId     String  @db.Uuid
+  investmentId String? @db.Uuid
+
+  agent      User        @relation("AgentCommissions", fields: [agentId], references: [id], onDelete: Restrict)
+  client     User        @relation("ClientCommissions", fields: [clientId], references: [id], onDelete: Restrict)
+  investment Investment? @relation(fields: [investmentId], references: [id], onDelete: SetNull)
+
+  // Commission Details
+  type       CommissionType
+  amount     Decimal        @db.Decimal(18, 2)
+  percentage Decimal?       @db.Decimal(5, 2)
+
+  // Weekly Commission (optional)
+  weekNumber Int?
+  year       Int?
+
+  // Status
+  status CommissionStatus @default(PENDING)
+
+  // Payment Information
+  creditedAt DateTime?
+  paidAt     DateTime?
+
+  // Transaction Reference
+  ledgerId String? @db.Uuid
+
+  // Metadata
+  remarks String? @db.Text
+
+  // Audit
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([agentId])
+  @@index([clientId])
+  @@index([investmentId])
+  @@index([status])
+  @@index([type])
+  @@index([weekNumber, year])
+  @@index([createdAt])
+  @@index([agentId, status])
+  @@index([agentId, createdAt])
+  @@map("agent_commissions")
+}
+
+model Withdrawal {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Relations
+  userId String @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Financial Details
+  amount    Decimal @db.Decimal(18, 2)
+  fee       Decimal @default(0.00) @db.Decimal(18, 2)
+  tax       Decimal @default(0.00) @db.Decimal(18, 2)
+  netAmount Decimal @db.Decimal(18, 2)
+
+  // Withdrawal Method
+  method WithdrawalMethod
+
+  // Bank Details
+  accountHolderName String? @db.VarChar(150)
+  bankName          String? @db.VarChar(100)
+  accountNumber     String? @db.VarChar(50)
+  ifscCode          String? @db.VarChar(20)
+
+  // UPI Details
+  upiId String? @db.VarChar(100)
+
+  // Transaction Tracking
+  transactionReference String? @unique @db.VarChar(100)
+
+  // Admin Workflow
+  status WithdrawalStatus @default(PENDING)
+
+  rejectionReason String? @db.Text
+
+  approvedById String? @db.Uuid
+
+  approvedBy User? @relation("ApprovedWithdrawals", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  processedAt DateTime?
+
+  remarks String? @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([method])
+  @@index([requestedAt])
+  @@index([approvedById])
+  @@index([userId, status])
+  @@index([status, requestedAt])
+  @@map("withdrawals")
+}
+
+model DepositRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Relations
+  userId String @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Deposit Amount
+  amount Decimal @db.Decimal(18, 2)
+
+  // Payment Method
+  method DepositMethod
+
+  // User Reference
+  transactionReference String @unique @db.VarChar(150)
+
+  // Gateway Details
+  gatewayOrderId       String? @unique @db.VarChar(150)
+  gatewayPaymentId     String? @unique @db.VarChar(150)
+  gatewayTransactionId String? @unique @db.VarChar(150)
+
+  // Optional Screenshot
+  paymentProofUrl String?
+
+  // Status
+  status DepositStatus @default(PENDING)
+
+  rejectionReason String? @db.Text
+
+  // Admin Review
+  reviewedById String? @db.Uuid
+
+  reviewer User? @relation("ReviewedDeposits", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  // Important Dates
+  depositedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  // Extra Metadata
+  metadata Json?
+
+  remarks String? @db.Text
+
+  // Audit
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([method])
+  @@index([depositedAt])
+  @@index([userId, status])
+  @@index([status, depositedAt])
+  @@map("deposit_requests")
+}
+
+model Ledger {
+  id String @id @default(uuid()) @db.Uuid
+
+  // User
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Transaction Details
+  transactionType LedgerTransactionType
+  entryType       LedgerEntryType
+
+  amount Decimal @db.Decimal(18, 2)
+
+  // Wallet Balance
+  balanceBefore Decimal @db.Decimal(18, 2)
+  balanceAfter  Decimal @db.Decimal(18, 2)
+
+  // Reference
+  referenceId   String?       @db.Uuid
+  referenceType ReferenceType
+
+  // External Transaction
+  externalTransactionId String? @db.VarChar(150)
+
+  // Description
+  description String @db.VarChar(255)
+
+  // Extra Data
+  metadata Json?
+
+  // Audit
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([transactionType])
+  @@index([entryType])
+  @@index([referenceType])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, transactionType])
+  @@map("ledger")
+}
+
+model KycDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  // User
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // KYC Provider
+  provider KycProvider @default(MANUAL)
+
+  // PAN Details
+  panNumber String? @db.VarChar(10)
+  panName   String?
+
+  // Aadhaar Details
+  aadhaarNumber String?   @db.VarChar(12)
+  aadhaarName   String?
+  aadhaarDob    DateTime? @db.Date
+
+  // Document URLs
+  panFrontUrl     String?
+  aadhaarFrontUrl String?
+  aadhaarBackUrl  String?
+  selfieUrl       String?
+
+  // Verification
+  status         KycStatus @default(PENDING)
+  faceMatchScore Decimal?  @db.Decimal(5, 2)
+
+  verifiedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?   @db.Text
+
+  // Admin Review
+  reviewedById String? @db.Uuid
+
+  reviewer User? @relation("ReviewedKyc", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  // External Provider
+  providerReferenceId String?
+  providerResponse    Json?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([provider])
+  @@index([reviewedById])
+  @@map("kyc_documents")
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Recipient
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Notification Content
+  title   String @db.VarChar(150)
+  message String @db.Text
+
+  // Type
+  type NotificationType
+
+  // Delivery Channel
+  channel NotificationChannel
+
+  // Priority
+  priority NotificationPriority @default(NORMAL)
+
+  // Status
+  status NotificationStatus @default(PENDING)
+
+  // Optional Action
+  actionUrl String?
+  imageUrl  String?
+
+  // Read Information
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // Delivery Information
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  failedAt    DateTime?
+
+  // Failure Reason
+  failureReason String? @db.Text
+
+  // Additional Data
+  metadata Json?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([channel])
+  @@index([priority])
+  @@index([isRead])
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("notifications")
+}
+
+model UserConsent {
+  id String @id @default(uuid()) @db.Uuid
+
+  // User
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Consent
+  consentType ConsentType
+  version     String      @db.VarChar(20)
+
+  accepted Boolean @default(true)
+
+  // Client Information
+  ipAddress String? @db.VarChar(45)
+  userAgent String?
+
+  // Optional Location
+  country String? @db.VarChar(100)
+  city    String? @db.VarChar(100)
+
+  // Optional Evidence
+  documentUrl String?
+
+  // Extra Metadata
+  metadata Json?
+
+  // Audit
+  acceptedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([consentType])
+  @@index([acceptedAt])
+  @@index([userId, consentType])
+  @@index([userId, acceptedAt])
+  @@map("user_consents")
+}
+
+model TradingCalendar {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Calendar Date
+  date      DateTime @db.Date
+  dayOfWeek Int // 1 = Monday, 7 = Sunday
+
+  // Status
+  isBusinessDay Boolean @default(true)
+  isHoliday     Boolean @default(false)
+
+  // Holiday Details
+  holidayName String?      @db.VarChar(150)
+  holidayType HolidayType?
+
+  // Trading Session
+  marketOpenTime  DateTime? @db.Time(0)
+  marketCloseTime DateTime? @db.Time(0)
+
+  // Settlement
+  settlementAllowed Boolean @default(true)
+  withdrawalAllowed Boolean @default(true)
+  investmentAllowed Boolean @default(true)
+
+  // Notes
+  remarks String? @db.Text
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([date])
+  @@index([date])
+  @@index([isBusinessDay])
+  @@index([isHoliday])
+  @@map("trading_calendar")
+}
+
+model AdminAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Admin who performed the action
+  adminId String? @db.Uuid
+
+  admin User? @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: SetNull)
+
+  // Action Information
+  action       AuditAction
+  resourceType AuditResource
+  resourceId   String?       @db.Uuid
+
+  // Description
+  title       String  @db.VarChar(150)
+  description String? @db.Text
+
+  // Previous & New Data
+  oldValues Json?
+  newValues Json?
+
+  // Request Information
+  ipAddress String? @db.VarChar(45)
+  userAgent String?
+
+  // Request Metadata
+  requestId String? @db.VarChar(100)
+  sessionId String? @db.VarChar(100)
+
+  // Status
+  status AuditStatus @default(SUCCESS)
+
+  // Extra Information
+  metadata Json?
+
+  // Timestamp
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([adminId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("admin_audit_logs")
+}
+
+model SupportTicket {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Customer
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ticket Details
+  ticketNumber String @unique @db.VarChar(30)
+
+  subject     String @db.VarChar(255)
+  description String @db.Text
+
+  category TicketCategory
+  priority TicketPriority @default(MEDIUM)
+  status   TicketStatus   @default(OPEN)
+
+  // Assignment
+  assignedToId String? @db.Uuid
+
+  assignedTo User? @relation("AssignedSupportTickets", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Attachment
+  attachmentUrl String?
+
+  // Resolution
+  resolution String?   @db.Text
+  resolvedAt DateTime?
+  closedAt   DateTime?
+
+  // Ratings
+  rating   Int?
+  feedback String?
+
+  // Metadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([ticketNumber])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+// ─── Stub models referenced in User relations ─────────────────────────────────
+// These must be defined if not already in your schema
+
+model UserDevice {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId  String   @db.VarChar(255)
+  platform  String?  @db.VarChar(50)
+  pushToken String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@map("user_devices")
+}
