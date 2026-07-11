@@ -10,13 +10,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
+import { Navbar } from "@/components/navbar/Navbar";
 
 export default function ArthmountLandingPage() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
 
-  // Handle active navigation link on scroll
+  // Drive the active nav-link highlight from scroll position
   useEffect(() => {
     const handleScroll = () => {
       const sections = document.querySelectorAll("section[id]");
@@ -30,71 +29,14 @@ export default function ArthmountLandingPage() {
       setActiveSection(current);
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden selection:bg-emerald-100">
-      {/* NAV */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-[5%] h-18 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm transition-shadow">
-        <Link href="#home" className="text-2xl font-extrabold text-emerald-600 tracking-tight">
-          Arth<span className="text-slate-900">mount</span>
-        </Link>
-
-        <ul className="hidden md:flex items-center gap-8">
-          {["Features", "How It Works", "Download", "FAQ", "Contact"].map((item) => {
-            const href = `#${item.toLowerCase().replace(/ /g, "-").replace("how-it-works", "how")}`;
-            return (
-              <li key={item}>
-                <Link
-                  href={href}
-                  className={`text-[0.9rem] font-medium transition-colors hover:text-slate-900 ${activeSection === href.substring(1) ? "text-slate-900" : "text-slate-500"
-                    }`}
-                >
-                  {item}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-
-        <div className="hidden md:flex gap-3">
-          <Button size="lg" variant="outline" className="border-slate-200 text-slate-500 hover:text-slate-900 hover:border-emerald-600 rounded-[10px] font-semibold px-5">
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_8px_24px_rgba(5,150,105,0.2)] hover:shadow-[0_12px_36px_rgba(5,150,105,0.28)] hover:-translate-y-0.5 transition-all rounded-[10px] font-semibol px-5">
-            <Link href="/signup">Start Investing</Link>
-          </Button>
-        </div>
-
-        {/* Hamburger */}
-        <Button size="icon-lg" variant="ghost" className="md:hidden cursor-pointer" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          {
-            isMenuOpen ? <X size={24} /> : <Menu size={30} />
-          }
-        </Button>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="absolute top-18 left-0 right-0 bg-white border-b border-slate-200 p-[5%] flex flex-col gap-4 shadow-lg md:hidden">
-            {["Features", "How It Works", "Download", "FAQ", "Contact"].map((item) => (
-              <Link
-                key={item}
-                href={`#${item.toLowerCase().replace(/ /g, "-").replace("how-it-works", "how")}`}
-                className="text-slate-600 font-medium py-2 border-b border-slate-100"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                {item}
-              </Link>
-            ))}
-            <div className="flex flex-col gap-3 mt-4">
-              <Button size="lg" variant="outline" className="w-full justify-center"> <Link href="/login">Login</Link></Button>
-              <Button size="lg" className="w-full justify-center bg-emerald-600 hover:bg-emerald-700"> <Link href="/signup">Start Investing</Link></Button>
-            </div>
-          </div>
-        )}
-      </nav>
+      {/* ── Navbar (auth-aware) ── */}
+      <Navbar activeSection={activeSection} />
 
       <section id="home" className="pt-32 pb-20 px-[5%] bg-white">
         <div className="max-w-295 mx-auto grid lg:grid-cols-2 gap-12 items-center">
@@ -117,7 +59,7 @@ export default function ArthmountLandingPage() {
 
             <div className="flex gap-4 pt-4">
               <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 rounded-xl px-8 h-14 font-semibold text-base shadow-lg shadow-emerald-600/20">
-                <Link href="/signup">Start Investing</Link>
+                <Link href="/register">Start Investing</Link>
               </Button>
               <Button size="lg" variant="outline" className="rounded-xl px-8 h-14 font-semibold text-base">
                 Learn More

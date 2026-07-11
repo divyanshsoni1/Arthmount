@@ -1,19 +1,10 @@
-"use client";
-import { queryClient } from "@/lib/client";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-
-export default function AppLayout(
-    {
-        children,
-    }: Readonly<{
-        children: React.ReactNode;
-    }>
-) {
-    return (
-        <QueryClientProvider client={queryClient}>
-            <ReactQueryDevtools initialIsOpen={false} />
-            {children}
-        </QueryClientProvider>
-    )
+/**
+ * Application route-group layout.
+ * QueryClientProvider is now at the root layout (app/layout.tsx) so it
+ * covers all routes including the public landing page. Nothing extra needed here.
+ */
+export default function AppLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return <>{children}</>;
 }
