@@ -104,9 +104,10 @@ export async function verifyLoginOtp(
     throw new AuthError(msg, errCode, status);
   }
 
-  // Name and role are embedded in the OTP token — no DB query needed here.
-  // Fire-and-forget the last-login update so it doesn't add latency.
-  void updateLastLogin(payload.userId);
+  // Fire-and-forget with error logging so a DB hiccup never blocks login
+  updateLastLogin(payload.userId).catch((err) =>
+    console.error("[Auth] Failed to update lastLoginAt:", err)
+  );
 
   const sessionToken = await signSessionToken({ userId: payload.userId, role: payload.role });
 

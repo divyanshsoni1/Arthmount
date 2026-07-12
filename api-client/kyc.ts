@@ -141,3 +141,38 @@ export function extractKycError(error: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+
+// ─── useSubmitFull ────────────────────────────────────────────────────────────
+// Sends all identity + document + selfie data in a single multipart request.
+
+export interface SubmitFullPayload {
+  aadhaarNumber: string;
+  panNumber:     string;
+  aadhaarFront:  File;
+  aadhaarBack:   File;
+  panFront:      File;
+  panBack:       File;
+  selfie:        File;
+}
+
+export function useSubmitFull() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["kyc", "submitFull"],
+    mutationFn:  async (payload: SubmitFullPayload): Promise<KycRecord> => {
+      const form = new FormData();
+      form.append("aadhaarNumber", payload.aadhaarNumber);
+      form.append("panNumber",     payload.panNumber);
+      form.append("aadhaarFront",  payload.aadhaarFront);
+      form.append("aadhaarBack",   payload.aadhaarBack);
+      form.append("panFront",      payload.panFront);
+      form.append("panBack",       payload.panBack);
+      form.append("selfie",        payload.selfie);
+      const res = await apiClient.post<ApiSuccess<{ kyc: KycRecord }>>("/kyc/submit-full", form);
+      return res.data.data.kyc;
+    },
+    onSuccess: (kyc) => {
+      qc.setQueryData(KYC_QUERY_KEY, kyc);
+    },
+  });
+}

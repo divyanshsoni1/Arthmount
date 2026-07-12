@@ -141,3 +141,66 @@ export async function handleSubmitKyc(req: NextRequest): Promise<NextResponse> {
     return handleError(err);
   }
 }
+
+// ─── POST /api/kyc/submit-full ────────────────────────────────────────────────
+// Receives all 6 files + identity as multipart/form-data.
+
+import { submitKycFull } from "./kyc.service";
+
+const MAX_FILE = 5 * 1024 * 1024;
+
+async function extractFileBuffer(
+  form: FormData,
+  field: string
+): Promise<{ buffer: Buffer; mimeType: string; filename: string; size: number } | null> {
+  const f = form.get(field) as File | null;
+  if (!f) return null;
+  return {
+    buffer:   Buffer.from(await f.arrayBuffer()),
+    mimeType: f.type,
+    filename: f.name,
+    size:     f.size,
+  };
+}
+
+export async function handleSubmitFull(req: NextRequest): Promise<NextResponse> {
+  try {
+    const userId = await requireAuth(req);
+
+    let form: FormData;
+    try { form = await req.formData(); } catch {
+      return errorResponse("Could not parse form data.", "BAD_REQUEST", 400);
+    }
+
+    const aadhaarNumber = (form.get("aadhaarNumber") as string | null)?.trim() ?? "";
+    const panNumber     = (form.get("panNumber")     as string | null)?.trim() ?? "";
+
+    if (!aadhaarNumber || !panNumber) {
+      return errorResponse("aadhaarNumber and panNumber are required.", "VALIDATION_ERROR", 422);
+    }
+
+    const slots = ["aadhaarFront", "aadhaarBack", "panFront", "panBack", "selfie"] as const;
+    const files: Record<string, { buffer: Buffer; mimeType: string; filename: string; size: number }> = {};
+
+    for (const slot of slots) {
+      const f = await extractFileBuffer(form, slot);
+      if (!f) return errorResponse(`Missing file: ${slot}`, "VALIDATION_ERROR", 422);
+      if (f.size > MAX_FILE) return errorResponse(`${slot} exceeds 5 MB limit.`, "FILE_TOO_LARGE", 422);
+      files[slot] = f;
+    }
+
+    const record = await submitKycFull(userId, {
+      aadhaarNumber,
+      panNumber,
+      aadhaarFront: files.aadhaarFront,
+      aadhaarBack:  files.aadhaarBack,
+      panFront:     files.panFront,
+      panBack:      files.panBack,
+      selfie:       files.selfie,
+    });
+
+    return successResponse({ kyc: record }, 201);
+  } catch (err) {
+    return handleError(err);
+  }
+}

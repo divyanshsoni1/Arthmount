@@ -1,0 +1,69 @@
+name: Deploy Arthmount
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            set -e
+
+            cd /var/www/arthmount
+
+            echo "Pulling latest code..."
+            git fetch origin
+            git reset --hard origin/main
+
+            echo "Installing dependencies..."
+            npm ci
+
+            echo "Generating Prisma Client..."
+            npx prisma generate
+
+            echo "Running database migrations..."
+            npx prisma migrate deploy
+
+            echo "Building Next.js..."
+            npm run build
+
+            echo "Restarting Next.js..."
+            sudo systemctl restart arthmount
+
+            echo "Restarting Worker..."
+            sudo systemctl restart arthmount-worker
+
+            echo "Deployment Completed Successfully!"

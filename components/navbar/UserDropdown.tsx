@@ -17,15 +17,24 @@ import {
 } from "lucide-react";
 
 import type { AuthUser } from "@/api-client/user";
-import { useLogout } from "@/api-client/user";
-import { UserAvatar } from "./UserAvatar";
+import { useLogout }    from "@/api-client/user";
+import { UserAvatar }   from "./UserAvatar";
+import { getDashboardRoute, isAdminRole } from "@/lib/routing";
 
-// Menu items
-const MENU_ITEMS = [
+// User-role menu items
+const USER_MENU_ITEMS = [
   { label: "Dashboard",            href: "/dashboard",       icon: LayoutDashboard },
   { label: "Add Money to Wallet",  href: "/dashboard/wallet", icon: Wallet         },
   { label: "Investing",            href: "/investing",       icon: TrendingUp      },
   { label: "Upload KYC Documents", href: "/dashboard/kyc",   icon: FileCheck       },
+] as const;
+
+// Admin-role menu items
+const ADMIN_MENU_ITEMS = [
+  { label: "Dashboard",   href: "/admin",       icon: LayoutDashboard },
+  { label: "Users",       href: "/admin/users", icon: FileCheck       },
+  { label: "KYC Requests",href: "/admin/kyc",   icon: FileCheck       },
+  { label: "Analytics",   href: "/admin/analytics", icon: TrendingUp  },
 ] as const;
 
 interface UserDropdownProps {
@@ -110,6 +119,7 @@ export function UserDropdown({ user }: UserDropdownProps) {
   }, [open]);
 
   const close = useCallback(() => setOpen(false), []);
+  const MENU_ITEMS = isAdminRole(user.role) ? ADMIN_MENU_ITEMS : USER_MENU_ITEMS;
 
   const handleLogout = () => {
     close();

@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { UseFormSetError } from "react-hook-form";
 import { z } from "zod";
+import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Phone normalisation ──────────────────────────────────────────────────────
 
@@ -126,7 +127,8 @@ export const useVerifyOtp = (
     },
     onSuccess: (data) => {
       onSuccess?.(data);
-      router.replace("/dashboard");
+      // Route to the correct dashboard based on the authenticated user's role
+      router.replace(getDashboardRoute(data.user.role));
     },
     onError: (error: unknown) => {
       const msg = extractApiError(error);
@@ -317,7 +319,8 @@ export const useSignupComplete = (
     },
     onSuccess: (data) => {
       onSuccess(data);
-      router.replace("/dashboard");
+      // New signups are always USER role
+      router.replace(getDashboardRoute(data.user.role));
     },
     onError: (err: unknown) => {
       const msg = extractApiError(err);
@@ -493,7 +496,8 @@ export const useFpResetPassword = (
     },
     onSuccess: () => {
       onSuccess();
-      router.replace("/dashboard");
+      // After password reset, user is re-authenticated as USER role
+      router.replace(getDashboardRoute("USER"));
     },
     onError: (err: unknown) => {
       setError("password", { message: extractApiError(err).message });

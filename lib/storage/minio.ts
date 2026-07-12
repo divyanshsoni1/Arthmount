@@ -110,7 +110,7 @@ export function validateFile(
  */
 export function generateObjectKey(
   userId: string,
-  docType: "aadhaar" | "pan",
+  docType: "aadhaar" | "pan" | "aadhaar_back" | "pan_back" | "selfie",
   originalFilename: string
 ): string {
   const ext       = extname(originalFilename).toLowerCase();

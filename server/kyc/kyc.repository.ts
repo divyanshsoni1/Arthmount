@@ -112,3 +112,46 @@ export async function updateKycStatus(
     },
   });
 }
+
+// ─── Upsert full KYC in one shot (new submit-full flow) ──────────────────────
+
+export interface FullKycInput {
+  aadhaarNumber:   string;
+  panNumber:       string;
+  aadhaarFrontUrl: string;
+  aadhaarBackUrl:  string;
+  panFrontUrl:     string;
+  panBackUrl:      string;
+  selfieUrl:       string;
+}
+
+export async function upsertFullKyc(
+  userId: string,
+  input:  FullKycInput
+): Promise<KycRecord> {
+  return prisma.kycDocument.upsert({
+    where:  { userId },
+    create: {
+      userId,
+      provider:        "MANUAL",
+      aadhaarNumber:   input.aadhaarNumber,
+      panNumber:       input.panNumber,
+      aadhaarFrontUrl: input.aadhaarFrontUrl,
+      aadhaarBackUrl:  input.aadhaarBackUrl,
+      panFrontUrl:     input.panFrontUrl,
+      selfieUrl:       input.selfieUrl,
+      status:          "IN_REVIEW",
+    },
+    update: {
+      aadhaarNumber:   input.aadhaarNumber,
+      panNumber:       input.panNumber,
+      aadhaarFrontUrl: input.aadhaarFrontUrl,
+      aadhaarBackUrl:  input.aadhaarBackUrl,
+      panFrontUrl:     input.panFrontUrl,
+      selfieUrl:       input.selfieUrl,
+      status:          "IN_REVIEW",
+      rejectionReason: null,
+    },
+    select: KYC_SELECT,
+  }) as Promise<KycRecord>;
+}
