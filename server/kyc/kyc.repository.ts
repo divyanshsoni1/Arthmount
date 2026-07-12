@@ -9,9 +9,14 @@ const KYC_SELECT = {
   panNumber:        true,
   aadhaarNumber:    true,
   panFrontUrl:      true,
+  panBackUrl:       true,
   aadhaarFrontUrl:  true,
+  aadhaarBackUrl:   true,
+  selfieUrl:        true,
   status:           true,
   rejectionReason:  true,
+  verifiedAt:       true,
+  rejectedAt:       true,
   createdAt:        true,
   updatedAt:        true,
 } as const;
@@ -23,9 +28,14 @@ export type KycRecord = Pick<
   | "panNumber"
   | "aadhaarNumber"
   | "panFrontUrl"
+  | "panBackUrl"
   | "aadhaarFrontUrl"
+  | "aadhaarBackUrl"
+  | "selfieUrl"
   | "status"
   | "rejectionReason"
+  | "verifiedAt"
+  | "rejectedAt"
   | "createdAt"
   | "updatedAt"
 >;

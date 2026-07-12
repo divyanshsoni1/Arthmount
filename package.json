@@ -61,7 +61,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@tanstack/eslint-plugin-query": "^5.101.2",
-    "@types/axios": "^0.9.36",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.19.43",
     "@types/react": "^19",

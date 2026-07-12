@@ -723,6 +723,7 @@ model KycDocument {
 
   // Document URLs
   panFrontUrl     String?
+  panBackUrl      String?
   aadhaarFrontUrl String?
   aadhaarBackUrl  String?
   selfieUrl       String?

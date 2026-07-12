@@ -5,9 +5,11 @@
  * useSaveIdentity   – POST /api/kyc  (Step 1)
  * useUploadDocument – POST /api/kyc/upload  (Step 2, multipart)
  * useSubmitKyc      – POST /api/kyc/submit  (Step 3)
+ * useSubmitFull     – POST /api/kyc/submit-full (single-shot: all files + identity)
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { AxiosProgressEvent } from "axios";
 import { apiClient } from "@/lib/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,16 +22,21 @@ export type KycStatus =
   | "AUTO_APPROVED";
 
 export interface KycRecord {
-  id:              string;
-  userId:          string;
-  panNumber:       string | null;
-  aadhaarNumber:   string | null;
-  panFrontUrl:     string | null;
-  aadhaarFrontUrl: string | null;
-  status:          KycStatus;
-  rejectionReason: string | null;
-  createdAt:       string;
-  updatedAt:       string;
+  id:               string;
+  userId:           string;
+  panNumber:        string | null;
+  aadhaarNumber:    string | null;
+  panFrontUrl:      string | null;
+  panBackUrl:       string | null;
+  aadhaarFrontUrl:  string | null;
+  aadhaarBackUrl:   string | null;
+  selfieUrl:        string | null;
+  status:           KycStatus;
+  rejectionReason:  string | null;
+  verifiedAt:       string | null;
+  rejectedAt:       string | null;
+  createdAt:        string;
+  updatedAt:        string;
 }
 
 interface ApiSuccess<T> { success: true; data: T }
@@ -102,7 +109,6 @@ export function useUploadDocument() {
       return res.data.data;
     },
     onSuccess: () => {
-      // Invalidate so the status card reflects the new URL
       qc.invalidateQueries({ queryKey: KYC_QUERY_KEY });
     },
   });
@@ -117,6 +123,65 @@ export function useSubmitKyc() {
     mutationKey: ["kyc", "submit"],
     mutationFn:  async () => {
       const res = await apiClient.post<ApiSuccess<{ kyc: KycRecord }>>("/kyc/submit");
+      return res.data.data.kyc;
+    },
+    onSuccess: (kyc) => {
+      qc.setQueryData(KYC_QUERY_KEY, kyc);
+    },
+  });
+}
+
+// ─── useSubmitFull ────────────────────────────────────────────────────────────
+// Sends all identity + document + selfie data in a single multipart request.
+// Supports upload progress tracking via onProgress callback.
+
+export interface SubmitFullPayload {
+  aadhaarNumber: string;
+  panNumber:     string;
+  aadhaarFront:  File;
+  aadhaarBack:   File;
+  panFront:      File;
+  panBack:       File;
+  selfie:        File;
+  /** Optional callback receiving 0–100 upload progress */
+  onProgress?:   (pct: number) => void;
+}
+
+export function useSubmitFull() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["kyc", "submitFull"],
+    mutationFn:  async ({
+      aadhaarNumber,
+      panNumber,
+      aadhaarFront,
+      aadhaarBack,
+      panFront,
+      panBack,
+      selfie,
+      onProgress,
+    }: SubmitFullPayload): Promise<KycRecord> => {
+      const form = new FormData();
+      form.append("aadhaarNumber", aadhaarNumber);
+      form.append("panNumber",     panNumber);
+      form.append("aadhaarFront",  aadhaarFront);
+      form.append("aadhaarBack",   aadhaarBack);
+      form.append("panFront",      panFront);
+      form.append("panBack",       panBack);
+      form.append("selfie",        selfie);
+
+      const res = await apiClient.post<ApiSuccess<{ kyc: KycRecord }>>(
+        "/kyc/submit-full",
+        form,
+        {
+          onUploadProgress: (evt: AxiosProgressEvent) => {
+            if (onProgress && evt.total && evt.total > 0) {
+              onProgress(Math.round((evt.loaded / evt.total) * 100));
+            }
+          },
+        }
+      );
       return res.data.data.kyc;
     },
     onSuccess: (kyc) => {
@@ -140,39 +205,4 @@ export function extractKycError(error: unknown): string {
     if (d?.error?.message) return d.error.message;
   }
   return "Something went wrong. Please try again.";
-}
-
-// ─── useSubmitFull ────────────────────────────────────────────────────────────
-// Sends all identity + document + selfie data in a single multipart request.
-
-export interface SubmitFullPayload {
-  aadhaarNumber: string;
-  panNumber:     string;
-  aadhaarFront:  File;
-  aadhaarBack:   File;
-  panFront:      File;
-  panBack:       File;
-  selfie:        File;
-}
-
-export function useSubmitFull() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationKey: ["kyc", "submitFull"],
-    mutationFn:  async (payload: SubmitFullPayload): Promise<KycRecord> => {
-      const form = new FormData();
-      form.append("aadhaarNumber", payload.aadhaarNumber);
-      form.append("panNumber",     payload.panNumber);
-      form.append("aadhaarFront",  payload.aadhaarFront);
-      form.append("aadhaarBack",   payload.aadhaarBack);
-      form.append("panFront",      payload.panFront);
-      form.append("panBack",       payload.panBack);
-      form.append("selfie",        payload.selfie);
-      const res = await apiClient.post<ApiSuccess<{ kyc: KycRecord }>>("/kyc/submit-full", form);
-      return res.data.data.kyc;
-    },
-    onSuccess: (kyc) => {
-      qc.setQueryData(KYC_QUERY_KEY, kyc);
-    },
-  });
 }
