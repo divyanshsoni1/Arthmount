@@ -1,10 +1,17 @@
 /**
  * Application route-group layout.
- * QueryClientProvider is now at the root layout (app/layout.tsx) so it
- * covers all routes including the public landing page. Nothing extra needed here.
+ * Renders the sticky top navigation bar for all user-facing pages.
+ * QueryClientProvider lives in the root app/layout.tsx.
  */
+import AppNavbar from "@/components/app-nav/AppNavbar";
+
 export default function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AppNavbar />
+      <main>{children}</main>
+    </div>
+  );
 }

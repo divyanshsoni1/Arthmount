@@ -17,6 +17,7 @@ import {
   getUserList, getUserById, setUserFrozen,
   getAuditLogs,
 } from "./admin.repository";
+import { getSignedUrl, extractKeyFromUrl } from "@/lib/storage/minio";
 import type { KycStatus, Role } from "@/lib/generated/prisma/client";
 
 // ─── Auth + role guard ────────────────────────────────────────────────────────
@@ -57,6 +58,40 @@ function pageParams(url: URL) {
   };
 }
 
+// ─── Sign all document URLs in a KYC record ───────────────────────────────────
+
+type KycWithUrls = Record<string, unknown> & {
+  aadhaarFrontUrl?: string | null;
+  aadhaarBackUrl?:  string | null;
+  panFrontUrl?:     string | null;
+  panBackUrl?:      string | null;
+  selfieUrl?:       string | null;
+};
+
+async function signKycDocUrls<T extends KycWithUrls>(kyc: T): Promise<T> {
+  const fields = ["aadhaarFrontUrl", "aadhaarBackUrl", "panFrontUrl", "panBackUrl", "selfieUrl"] as const;
+  const signed: Partial<Record<typeof fields[number], string | null>> = {};
+
+  await Promise.all(
+    fields.map(async (field) => {
+      const rawUrl = kyc[field];
+      if (!rawUrl) { signed[field] = null; return; }
+      const key = extractKeyFromUrl(rawUrl);
+      if (key) {
+        try {
+          signed[field] = await getSignedUrl(key, 3600);
+        } catch {
+          signed[field] = null; // fail safe — don't expose raw URL
+        }
+      } else {
+        signed[field] = null;
+      }
+    })
+  );
+
+  return { ...kyc, ...signed };
+}
+
 // ─── GET /api/admin/stats ─────────────────────────────────────────────────────
 
 export async function handleGetStats(req: NextRequest): Promise<NextResponse> {
@@ -94,7 +129,8 @@ export async function handleGetKycDetail(
     await requireAdmin(req);
     const record = await getKycById(id);
     if (!record) return errorResponse("KYC record not found.", "NOT_FOUND", 404);
-    return successResponse({ kyc: record });
+    const signedKyc = await signKycDocUrls(record as KycWithUrls);
+    return successResponse({ kyc: signedKyc });
   } catch (err) { return handleError(err); }
 }
 
@@ -162,7 +198,15 @@ export async function handleGetUser(
     await requireAdmin(req);
     const user = await getUserById(id);
     if (!user) return errorResponse("User not found.", "NOT_FOUND", 404);
-    return successResponse({ user });
+
+    // Sign KYC document URLs if present
+    let signedUser: typeof user = user;
+    if (user.kycDocument) {
+      const signedKyc = await signKycDocUrls(user.kycDocument as KycWithUrls);
+      signedUser = { ...user, kycDocument: signedKyc as typeof user.kycDocument };
+    }
+
+    return successResponse({ user: signedUser });
   } catch (err) { return handleError(err); }
 }
 

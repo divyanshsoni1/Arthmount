@@ -29,19 +29,26 @@ export interface ChartPoint { date: string; users?: number; amount?: number }
 export interface AdminUser {
   id: string; name: string; email: string | null; phone: string | null;
   role: string; kycStatus: string; isFrozen: boolean;
-  mainBalance: string; investedBalance: string;
-  createdAt: string; lastLoginAt: string | null;
+  mainBalance: string; investedBalance: string; commissionBalance?: string;
+  createdAt: string; lastLoginAt: string | null; deletedAt?: string | null;
 }
 
 export interface AdminKyc {
   id: string; status: string;
   panNumber: string | null; aadhaarNumber: string | null;
-  panFrontUrl: string | null; aadhaarFrontUrl: string | null;
-  aadhaarBackUrl: string | null; selfieUrl: string | null;
+  panFrontUrl: string | null; panBackUrl: string | null;
+  aadhaarFrontUrl: string | null; aadhaarBackUrl: string | null;
+  selfieUrl: string | null;
   rejectionReason: string | null;
   createdAt: string; updatedAt: string;
   user: { id: string; name: string; email: string | null; phone: string | null; createdAt: string };
   reviewer?: { id: string; name: string } | null;
+}
+
+export interface AdminUserDetail extends AdminUser {
+  kycDocument: AdminKyc | null;
+  depositRequests: { id: string; amount: string; status: string; depositedAt: string | null }[];
+  investments: { id: string; principalAmount: string; status: string; investedAt: string }[];
 }
 
 export interface AuditLog {
@@ -66,11 +73,13 @@ export function useAdminStats() {
 
 // ─── KYC list ─────────────────────────────────────────────────────────────────
 
-export function useAdminKycList(status: string, page: number) {
+export function useAdminKycList(status: string, page: number, search?: string) {
   return useQuery({
-    queryKey: ["admin", "kyc", status, page],
+    queryKey: ["admin", "kyc", status, page, search ?? ""],
     queryFn: async () => {
-      const r = await apiClient.get<ApiSuccess<{ records: AdminKyc[]; total: number; pages: number }>>(`/admin/kyc?status=${status}&page=${page}&limit=20`);
+      const params = new URLSearchParams({ status, page: String(page), limit: "20" });
+      if (search) params.set("search", search);
+      const r = await apiClient.get<ApiSuccess<{ records: AdminKyc[]; total: number; pages: number }>>(`/admin/kyc?${params}`);
       return r.data.data;
     },
     staleTime: 30_000, retry: false,
@@ -79,7 +88,7 @@ export function useAdminKycList(status: string, page: number) {
 
 export function useAdminKycDetail(id: string) {
   return useQuery({
-    queryKey: ["admin", "kyc", id],
+    queryKey: ["admin", "kyc", "detail", id],
     queryFn: async () => {
       const r = await apiClient.get<ApiSuccess<{ kyc: AdminKyc }>>(`/admin/kyc/${id}`);
       return r.data.data.kyc;
@@ -108,12 +117,15 @@ export function useRejectKyc(id: string) {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
-export function useAdminUserList(search: string, role: string, page: number) {
+export function useAdminUserList(search: string, role: string, page: number, kycStatus?: string, frozen?: string) {
   return useQuery({
-    queryKey: ["admin", "users", search, role, page],
+    queryKey: ["admin", "users", search, role, page, kycStatus ?? "", frozen ?? ""],
     queryFn: async () => {
+      const params = new URLSearchParams({ search, role, page: String(page), limit: "20" });
+      if (kycStatus && kycStatus !== "ALL") params.set("kycStatus", kycStatus);
+      if (frozen && frozen !== "ALL") params.set("frozen", frozen);
       const r = await apiClient.get<ApiSuccess<{ users: AdminUser[]; total: number; pages: number }>>(
-        `/admin/users?search=${encodeURIComponent(search)}&role=${role}&page=${page}&limit=20`
+        `/admin/users?${params}`
       );
       return r.data.data;
     },
@@ -123,9 +135,9 @@ export function useAdminUserList(search: string, role: string, page: number) {
 
 export function useAdminUserDetail(id: string) {
   return useQuery({
-    queryKey: ["admin", "users", id],
+    queryKey: ["admin", "users", "detail", id],
     queryFn: async () => {
-      const r = await apiClient.get<ApiSuccess<{ user: AdminUser & { kycDocument: AdminKyc | null; depositRequests: unknown[]; investments: unknown[] } }>>(`/admin/users/${id}`);
+      const r = await apiClient.get<ApiSuccess<{ user: AdminUserDetail }>>(`/admin/users/${id}`);
       return r.data.data.user;
     },
     enabled: !!id, staleTime: 0, retry: false,
@@ -142,6 +154,17 @@ export function useFreezeUser(id: string) {
       qc.invalidateQueries({ queryKey: ["admin", "stats"] });
     },
   });
+}
+
+// ─── Refresh signed URL (client-side helper) ─────────────────────────────────
+
+/**
+ * Fetches a fresh signed URL for a given object key from the admin signed-url endpoint.
+ * Called client-side when a document fails to load (expired URL).
+ */
+export async function fetchSignedUrl(key: string): Promise<string> {
+  const r = await apiClient.get<ApiSuccess<{ url: string }>>(`/admin/kyc/signed-url?key=${encodeURIComponent(key)}`);
+  return r.data.data.url;
 }
 
 // ─── Audit logs ───────────────────────────────────────────────────────────────

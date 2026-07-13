@@ -15,8 +15,10 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
   type PutObjectCommandInput,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl as awsGetSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomBytes } from "crypto";
 import { extname } from "path";
 
@@ -165,5 +167,46 @@ export async function deleteFile(key: string): Promise<void> {
     );
   } catch (err) {
     console.error("[Storage] Failed to delete object:", key, err);
+  }
+}
+
+// ─── Signed URL ───────────────────────────────────────────────────────────────
+
+/**
+ * Generates a temporary pre-signed GET URL for a stored object key.
+ * Default expiry: 60 minutes (admin KYC review sessions).
+ * Never call this from client code — only from server-side handlers.
+ */
+export async function getSignedUrl(
+  key:            string,
+  expiresInSecs:  number = 3600
+): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: getBucket(), Key: key });
+  return awsGetSignedUrl(getClient(), command, { expiresIn: expiresInSecs });
+}
+
+/**
+ * Extracts the object key from a full MinIO URL.
+ * URL format: {S3_ENDPOINT}/{bucket}/{key}
+ * Returns null if the URL doesn't match expected pattern.
+ */
+export function extractKeyFromUrl(url: string): string | null {
+  try {
+    const endpoint = (process.env.S3_ENDPOINT ?? "").replace(/\/$/, "");
+    const bucket   = process.env.AWS_S3_BUCKET ?? "";
+    const prefix   = `${endpoint}/${bucket}/`;
+    if (url.startsWith(prefix)) {
+      return url.slice(prefix.length);
+    }
+    // Fallback: parse URL and strip leading slash from pathname after /bucket/
+    const parsed = new URL(url);
+    const parts  = parsed.pathname.replace(/^\//, "").split("/");
+    if (parts.length > 1) {
+      // First segment is bucket name, rest is the key
+      return parts.slice(1).join("/");
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
