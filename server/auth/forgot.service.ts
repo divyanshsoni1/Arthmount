@@ -44,9 +44,20 @@ import {
   updateForgotSession,
   deleteForgotSession,
 } from "@/lib/forgot-session";
-import { findUserByEmailOrPhone } from "./auth.repository";
+import { findUserByEmailOrPhone, findUserById } from "./auth.repository";
 import { updatePassword }         from "./auth.repository";
 import { AuthError }              from "./auth.service";
+import { normalizePhone }         from "@/lib/phone";
+
+// ─── Structured logger ────────────────────────────────────────────────────────
+
+function log(event: string, data?: Record<string, unknown>) {
+  console.log(JSON.stringify({ ts: new Date().toISOString(), service: "forgot", event, ...data }));
+}
+
+function logError(event: string, err: unknown, data?: Record<string, unknown>) {
+  console.error(JSON.stringify({ ts: new Date().toISOString(), service: "forgot", event, error: String(err), ...data }));
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -144,9 +155,13 @@ export interface SendPhoneOtpResult {
 }
 
 export async function fpSendPhoneOtp(phone: string): Promise<SendPhoneOtpResult> {
+  // Normalise phone — the controller already validates format, but defence-in-depth
+  const normalizedPhone = normalizePhone(phone) ?? phone;
+
   // Look up user — same response whether found or not (prevents enumeration)
-  const user = await findUserByEmailOrPhone(phone);
+  const user = await findUserByEmailOrPhone(normalizedPhone);
   if (!user) {
+    log("phone_otp.failed", { reason: "USER_NOT_FOUND", phone: normalizedPhone });
     throw new AuthError(
       "No account found with this phone number.",
       "USER_NOT_FOUND",
@@ -154,10 +169,11 @@ export async function fpSendPhoneOtp(phone: string): Promise<SendPhoneOtpResult>
     );
   }
   if (user.isFrozen) {
+    log("phone_otp.failed", { reason: "ACCOUNT_FROZEN", userId: user.id });
     throw new AuthError("Your account is frozen. Contact support.", "ACCOUNT_FROZEN", 403);
   }
 
-  const sessionId = await createForgotSession(phone);
+  const sessionId = await createForgotSession(normalizedPhone);
   await checkRateLimit(phoneRlKey(sessionId));
 
   const [otp, forgotToken] = await Promise.all([
@@ -165,11 +181,18 @@ export async function fpSendPhoneOtp(phone: string): Promise<SendPhoneOtpResult>
     signForgotToken(sessionId, user.name),
   ]);
 
-  void enqueueOtpJob({ type: "phone", to: phone, otp });
+  // Awaited — OTP must be enqueued before we tell the user it was sent
+  try {
+    await enqueueOtpJob({ type: "phone", to: normalizedPhone, otp });
+    log("phone_otp.enqueued", { sessionId, userId: user.id });
+  } catch (err) {
+    logError("phone_otp.enqueue_failed", err, { sessionId });
+    throw new AuthError("Unable to send OTP. Please try again.", "OTP_DELIVERY_FAILED", 503);
+  }
 
   return {
     forgotToken,
-    maskedPhone: `+${phone.slice(0, 4)}****${phone.slice(-2)}`,
+    maskedPhone: `${normalizedPhone.slice(0, 2)}******${normalizedPhone.slice(-2)}`,
   };
 }
 
@@ -245,15 +268,20 @@ export async function fpSendEmailOtp(forgotToken: string): Promise<SendEmailOtpR
     signForgotToken(sessionId, name),
   ]);
 
-  void enqueueOtpJob({ type: "email", to: session.email, otp, name: session.name ?? name });
+  // Awaited — if the job can't be queued the user must not be told OTP was sent
+  try {
+    await enqueueOtpJob({ type: "email", to: session.email, otp, name: session.name ?? name });
+    log("email_otp.enqueued", { sessionId });
+  } catch (err) {
+    logError("email_otp.enqueue_failed", err, { sessionId });
+    throw new AuthError("Unable to send OTP. Please try again.", "OTP_DELIVERY_FAILED", 503);
+  }
 
   return {
     forgotToken: refreshed,
     maskedEmail: maskEmail(session.email),
   };
 }
-
-// ─── Step 4: verify-email-otp ─────────────────────────────────────────────────
 
 export interface VerifyEmailOtpResult {
   forgotToken: string;
@@ -313,7 +341,14 @@ export async function fpResetPassword(
   void deleteForgotSession(sessionId);
   void redis.del(phoneRlKey(sessionId), emailRlKey(sessionId));
 
-  const sessionToken = await signSessionToken({ userId: session.userId, role: "USER" });
+  // Look up the user's actual role — never hardcode "USER" here because admins
+  // can also use forgot-password and must be redirected to /admin after reset.
+  const user = await findUserById(session.userId);
+  if (!user) throw new AuthError("Account not found.", "USER_NOT_FOUND", 404);
+
+  const sessionToken = await signSessionToken({ userId: session.userId, role: user.role });
+
+  log("password.reset", { userId: session.userId, role: user.role });
 
   return { sessionToken };
 }

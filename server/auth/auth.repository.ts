@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { User } from "@/lib/generated/prisma/client";
+import { normalizePhone } from "@/lib/phone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ export async function findUserById(id: string): Promise<AuthUser | null> {
 
 /**
  * Look up a user by email (case-insensitive) or normalised phone number.
+ * Phone input is normalised before querying so "9876543210", "919876543210",
+ * and "+91 98765 43210" all resolve to the same canonical 10-digit record.
  * Returns null when not found — never throws.
  */
 export async function findUserByEmailOrPhone(
@@ -51,12 +54,32 @@ export async function findUserByEmailOrPhone(
 ): Promise<AuthUser | null> {
   const isEmail = identifier.includes("@");
 
-  return prisma.user.findFirst({
-    where: isEmail
-      ? { email: { equals: identifier, mode: "insensitive" } }
-      : { phone: identifier },
+  if (isEmail) {
+    return prisma.user.findFirst({
+      where:  { email: { equals: identifier.trim().toLowerCase(), mode: "insensitive" } },
+      select: AUTH_SELECT,
+    });
+  }
+
+  // Always normalise phone before querying
+  const phone = normalizePhone(identifier) ?? identifier;
+
+  const user = await prisma.user.findFirst({
+    where:  { phone },
     select: AUTH_SELECT,
   });
+
+  if (!user) {
+    console.log(JSON.stringify({
+      ts:      new Date().toISOString(),
+      service: "auth.repository",
+      event:   "phone_lookup.not_found",
+      raw:     identifier,
+      normalized: phone,
+    }));
+  }
+
+  return user;
 }
 
 /**

@@ -7,11 +7,17 @@ import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Phone normalisation ──────────────────────────────────────────────────────
 
+/**
+ * Client-side mirror of lib/phone.ts normalizePhone().
+ * Canonical format: XXXXXXXXXX (10 digits, no country code prefix).
+ * Must produce identical output to the server-side utility for any given input.
+ */
 function normalizePhone(phone: string): string {
   let digits = phone.replace(/\D/g, "");
+  // Remove leading zero
   if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length === 10) return `91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return digits;
+  // Strip 91 country code when total is 12 digits
+  if (digits.length === 12 && digits.startsWith("91")) digits = digits.slice(2);
   return digits;
 }
 
@@ -43,7 +49,7 @@ export const loginSchema = z
         (value) => {
           const isEmail = value.includes("@");
           if (isEmail) return z.string().email().safeParse(value).success;
-          return /^91\d{10}$/.test(normalizePhone(value));
+          return /^\d{10}$/.test(normalizePhone(value));
         },
         { message: "Enter a valid email or 10-digit phone number" }
       )
@@ -127,6 +133,12 @@ export const useVerifyOtp = (
     },
     onSuccess: (data) => {
       onSuccess?.(data);
+      // Clean up the OTP context stored for this sign-in attempt
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("otp_token");
+        sessionStorage.removeItem("otp_channel");
+        sessionStorage.removeItem("otp_destination");
+      }
       // Route to the correct dashboard based on the authenticated user's role
       router.replace(getDashboardRoute(data.user.role));
     },

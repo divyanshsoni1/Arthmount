@@ -80,7 +80,14 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Add Cache-Control: no-store to all protected page responses so the browser
+  // cannot serve a stale cached copy after logout (prevents back-button bypass).
+  const res = NextResponse.next();
+  if (isProtected && isAuthenticated) {
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.headers.set("Pragma", "no-cache");
+  }
+  return res;
 }
 
 export const config = {

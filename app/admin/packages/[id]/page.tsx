@@ -27,6 +27,7 @@ import {
   type PackageInvestmentRow,
 } from "@/api-client/packages";
 import { useUser } from "@/api-client/user";
+import { Switch } from "@/components/ui/switch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -233,15 +234,40 @@ function EditModal({ pkg, onClose }: { pkg: AdminPackageDetail; onClose: () => v
                 {errors.tenureDays && <p className="mt-1 text-[11px] text-red-500">{errors.tenureDays}</p>}
               </div>
             </div>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" checked={form.isActive} onChange={(e) => set("isActive", e.target.checked)} className="h-4 w-4 rounded accent-emerald-500" />
-                <span className="text-xs font-semibold text-slate-600">Active</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input type="checkbox" checked={form.isVisible} onChange={(e) => set("isVisible", e.target.checked)} className="h-4 w-4 rounded accent-emerald-500" />
-                <span className="text-xs font-semibold text-slate-600">Visible to users</span>
-              </label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Package Active toggle */}
+              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
+                form.isActive ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-slate-50"
+              }`}>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Package Active</p>
+                  <p className={`text-[10px] font-medium mt-0.5 ${form.isActive ? "text-emerald-600" : "text-slate-400"}`}>
+                    {form.isActive ? "ON" : "OFF"}
+                  </p>
+                </div>
+                <Switch
+                  checked={form.isActive}
+                  onCheckedChange={(checked) => set("isActive", checked)}
+                  aria-label="Package Active"
+                />
+              </div>
+
+              {/* Visible to Users toggle */}
+              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-colors ${
+                form.isVisible ? "border-emerald-200 bg-emerald-50/60" : "border-slate-200 bg-slate-50"
+              }`}>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Visible to Users</p>
+                  <p className={`text-[10px] font-medium mt-0.5 ${form.isVisible ? "text-emerald-600" : "text-slate-400"}`}>
+                    {form.isVisible ? "ON" : "OFF"}
+                  </p>
+                </div>
+                <Switch
+                  checked={form.isVisible}
+                  onCheckedChange={(checked) => set("isVisible", checked)}
+                  aria-label="Visible to Users"
+                />
+              </div>
             </div>
             {submitErr && <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-3.5 py-2.5 text-xs text-red-600"><AlertCircle size={13} /> {submitErr}</div>}
           </div>

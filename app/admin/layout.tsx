@@ -152,8 +152,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Close mobile drawer on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Role guard (proxy handles it server-side; this is a belt-and-suspenders)
-  if (!isLoading && user && !["ADMIN", "SUPER_ADMIN"].includes(user.role)) {
+  // While the /api/auth/me fetch is in-flight, render nothing to avoid a
+  // flash of admin content to unauthorised users. Middleware handles the
+  // server-side redirect; this is a belt-and-suspenders client guard.
+  if (isLoading) return null;
+
+  // Unauthenticated client (middleware should have redirected, but guard here
+  // too in case of a client-side navigation that bypassed middleware).
+  if (!user) {
+    router.replace("/login");
+    return null;
+  }
+
+  // Wrong role — regular user navigated here via client-side link.
+  if (!["ADMIN", "SUPER_ADMIN"].includes(user.role)) {
     router.replace("/dashboard");
     return null;
   }

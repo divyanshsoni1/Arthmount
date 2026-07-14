@@ -11,8 +11,19 @@ import { signSessionToken, signOtpToken, verifyOtpToken, type OtpTokenPayload } 
 import { createHmac, timingSafeEqual } from "crypto";
 import { redis } from "@/lib/redis";
 import { enqueueOtpJob } from "@/lib/otpQueue";
+import { normalizePhone } from "@/lib/phone";
 import { phoneExists, createUser } from "./signup.repository";
 import { AuthError } from "./auth.service";
+
+// ─── Structured logger ────────────────────────────────────────────────────────
+
+function log(event: string, data?: Record<string, unknown>) {
+  console.log(JSON.stringify({ ts: new Date().toISOString(), service: "signup", event, ...data }));
+}
+
+function logError(event: string, err: unknown, data?: Record<string, unknown>) {
+  console.error(JSON.stringify({ ts: new Date().toISOString(), service: "signup", event, error: String(err), ...data }));
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -75,8 +86,14 @@ export async function sendSignupOtp(
   const session = await getSignupSession(sessionId);
   if (!session) throw new AuthError("Signup session expired. Please start again.", "SESSION_EXPIRED", 401);
 
-  // Check phone not already taken
-  if (await phoneExists(phone)) {
+  // Normalise phone server-side — canonical format: XXXXXXXXXX (10 digits)
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone) {
+    throw new AuthError("Invalid phone number.", "INVALID_PHONE", 422);
+  }
+
+  // Check phone not already taken (use normalised form)
+  if (await phoneExists(normalizedPhone)) {
     throw new AuthError("This phone number is already registered.", "PHONE_TAKEN", 409);
   }
 
@@ -84,6 +101,7 @@ export async function sendSignupOtp(
   const count = await redis.incr(rlKey(sessionId));
   if (count === 1) await redis.expire(rlKey(sessionId), RATE_LIMIT_WIN);
   if (count > RATE_LIMIT_MAX) {
+    log("otp.rate_limited", { sessionId });
     throw new AuthError("Too many OTP requests. Please wait 10 minutes.", "OTP_RATE_LIMITED", 429);
   }
 
@@ -92,11 +110,19 @@ export async function sendSignupOtp(
   const record: OtpRecord  = { hash: hmacOtp(code), attempts: 0 };
   await redis.set(otpKey(sessionId), JSON.stringify(record), "EX", OTP_TTL_SEC);
 
-  // Store phone in session
-  await updateSignupSession(sessionId, { phone });
+  // Store normalised phone in session
+  await updateSignupSession(sessionId, { phone: normalizedPhone });
 
-  // Enqueue WhatsApp delivery
-  void enqueueOtpJob({ type: "phone", to: phone, otp: code });
+  // Enqueue WhatsApp delivery — AWAITED so failure is caught and surfaced
+  try {
+    await enqueueOtpJob({ type: "phone", to: normalizedPhone, otp: code });
+    log("otp.enqueued", { sessionId, channel: "phone" });
+  } catch (err) {
+    logError("otp.enqueue_failed", err, { sessionId });
+    // Roll back OTP record so the user can retry cleanly
+    await redis.del(otpKey(sessionId));
+    throw new AuthError("Unable to send OTP. Please try again.", "OTP_DELIVERY_FAILED", 503);
+  }
 
   // Refresh token so expiry resets
   const refreshedToken = await signOtpToken({
@@ -107,7 +133,7 @@ export async function sendSignupOtp(
   });
 
   return {
-    maskedPhone:  `+${phone.slice(0, 4)}****${phone.slice(-2)}`,
+    maskedPhone:  `${normalizedPhone.slice(0, 2)}******${normalizedPhone.slice(-2)}`,
     signupToken:  refreshedToken,
   };
 }
@@ -153,6 +179,8 @@ export async function verifySignupOtp(
 
   await redis.del(otpKey(sessionId));
   await updateSignupSession(sessionId, { phoneVerified: true });
+
+  log("otp.verified", { sessionId });
 
   const refreshedToken = await signOtpToken({
     userId:  sessionId,
@@ -206,6 +234,8 @@ export async function completeSignup(
   void redis.del(rlKey(sessionId));
 
   const sessionToken = await signSessionToken({ userId: user.id, role: user.role });
+
+  log("signup.completed", { userId: user.id, role: user.role });
 
   return {
     sessionToken,

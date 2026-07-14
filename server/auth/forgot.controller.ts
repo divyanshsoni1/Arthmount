@@ -36,7 +36,7 @@ async function parseBody<T>(
 // ─── POST /api/auth/forgot/send-phone-otp ────────────────────────────────────
 
 const sendPhoneOtpSchema = z.object({
-  phone: z.string().regex(/^91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
+  phone: z.string().regex(/^\d{10}$/, "Enter a valid 10-digit Indian phone number"),
 });
 
 export async function handleFpSendPhoneOtp(req: NextRequest): Promise<NextResponse> {
