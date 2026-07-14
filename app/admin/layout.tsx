@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Link            from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3, Bell, ChevronLeft, ChevronRight, ClipboardList,
+  BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardList,
   FileCheck, LayoutDashboard, LogOut, Menu, Shield,
   Users, X, TrendingUp, Settings, Search, Activity,
-  CircleDot,
+  CircleDot, Package,
 } from "lucide-react";
 import { useUser, useLogout } from "@/api-client/user";
 
@@ -26,6 +26,8 @@ const NAV_GROUPS = [
     items: [
       { label: "Users",        href: "/admin/users",      icon: Users,       exact: false },
       { label: "KYC Requests", href: "/admin/kyc",        icon: FileCheck,   exact: false },
+      { label: "Packages",          href: "/admin/packages",         icon: Package,      exact: false },
+      { label: "Trading Calendar",  href: "/admin/trading-calendar", icon: CalendarDays, exact: false },
     ],
   },
   {

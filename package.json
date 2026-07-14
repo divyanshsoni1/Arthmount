@@ -21,7 +21,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:fresh": "prisma migrate reset --force && npm run db:seed",
     "db:generate": "npm run prisma:generate",
-    "script:reset": "npm run cleanup && npm run seed",
+    "script:reset": "npm run script:cleanup && npm run db:seed",
     "script:cleanup": "tsx prisma/cleanup.ts",
     "worker:otp": "tsx workers/otp-worker.ts"
   },
@@ -43,6 +43,7 @@
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.42.2",
     "ioredis": "^5.11.1",
     "jose": "^6.2.3",
     "lucide-react": "^1.24.0",

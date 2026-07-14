@@ -1,103 +1,169 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 
-<body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>Arthmount - Verify Your Email</title>
+</head>
 
-<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f4f7fb">
-<tr>
-<td align="center" style="padding:40px 20px;">
-
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;">
-
-    <!-- Header -->
-    <tr>
-        <td align="center" bgcolor="#0f172a" style="padding:30px;">
-            <h1 style="margin:0;color:#ffffff;font-size:28px;">
-                Arthmount
-            </h1>
-            <p style="margin-top:8px;color:#cbd5e1;font-size:14px;">
-                Secure Investment Platform
-            </p>
-        </td>
-    </tr>
-
-    <!-- Body -->
-    <tr>
-        <td style="padding:40px;">
-
-            <h2 style="margin-top:0;color:#111827;">
-                Hello {{name}},
-            </h2>
-
-            <p style="font-size:16px;color:#4b5563;line-height:1.7;">
-                We received a request to verify your account.
-                Please use the One-Time Password (OTP) below to continue.
-            </p>
-
-            <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                    <td align="center" style="padding:30px 0;">
-                        <div style="
-                            display:inline-block;
-                            background:#2563eb;
-                            color:#ffffff;
-                            padding:18px 40px;
-                            font-size:34px;
-                            font-weight:bold;
-                            border-radius:10px;
-                            letter-spacing:8px;">
-                            {{otp}}
-                        </div>
-                    </td>
-                </tr>
-            </table>
-
-            <p style="font-size:15px;color:#4b5563;line-height:1.7;">
-                This OTP is valid for
-                <strong>5 minutes</strong>.
-            </p>
-
-            <p style="font-size:15px;color:#ef4444;line-height:1.7;">
-                <strong>Security Notice:</strong><br>
-                Never share your OTP with anyone.
-                Arthmount will never ask for your OTP over phone, email, or WhatsApp.
-            </p>
-
-            <hr style="border:none;border-top:1px solid #e5e7eb;margin:30px 0;">
-
-            <p style="font-size:14px;color:#6b7280;line-height:1.7;">
-                If you did not request this verification, you can safely ignore this email.
-                Your account remains secure.
-            </p>
-
-        </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-        <td bgcolor="#f8fafc" align="center" style="padding:30px;">
-
-            <p style="margin:0;font-size:14px;color:#6b7280;">
-                Thank you for choosing
-                <strong>Arthmount</strong>.
-            </p>
-
-            <p style="margin:12px 0 0;color:#9ca3af;font-size:13px;">
-                © {{year}} Arthmount. All Rights Reserved.
-            </p>
-
-            <p style="margin-top:12px;color:#9ca3af;font-size:12px;">
-                This is an automated email. Please do not reply.
-            </p>
-
-        </td>
-    </tr>
-
-</table>
-
-</td>
-</tr>
-</table>
-
+<body
+    style="margin:0;padding:0;background-color:#F8FAFC;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1E293B;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+        style="background-color:#F8FAFC;margin:0;padding:32px 12px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"
+                    style="width:100%;max-width:600px;background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" bgcolor="#0F172A" style="padding:36px 32px;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" style="background:#FFFFFF;border-radius:16px;padding:10px;">
+                                        <img src="https://arthmount.vercel.app/favicon.ico" alt="Arthmount" width="44"
+                                            height="44"
+                                            style="display:block;border:0;outline:none;text-decoration:none;width:44px;height:44px;">
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr> <!-- Hero -->
+                    <tr>
+                        <td style="padding:42px 36px 18px 36px;">
+                            <div style="font-size:15px;color:#64748B;line-height:24px;"> Hello {{name}}, </div>
+                            <div style="height:18px;">&nbsp;</div>
+                            <div style="font-size:30px;font-weight:700;line-height:38px;color:#1E293B;"> Verify Your
+                                Email Address </div>
+                            <div style="height:18px;">&nbsp;</div>
+                            <div style="font-size:16px;line-height:28px;color:#64748B;"> To securely verify your
+                                identity and protect your Arthmount account, please use the One-Time Password (OTP)
+                                below. This verification is required before you can continue. </div>
+                        </td>
+                    </tr> <!-- OTP Card -->
+                    <tr>
+                        <td style="padding:12px 36px 8px 36px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="border:2px solid #16A34A;border-radius:14px;background-color:#FFFFFF;">
+                                <tr>
+                                    <td align="center" style="padding:34px 24px;">
+                                        <div
+                                            style="font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#64748B;">
+                                            Your Verification Code </div>
+                                        <div style="height:20px;">&nbsp;</div>
+                                        <div
+                                            style="font-size:42px;font-weight:700;letter-spacing:10px;line-height:48px;color:#16A34A;font-family:Courier New,Courier,monospace;">
+                                            {{otp}} </div>
+                                        <div style="height:20px;">&nbsp;</div>
+                                        <div style="font-size:15px;line-height:26px;color:#64748B;"> Valid for <strong
+                                                style="color:#1E293B;">5 minutes</strong> </div>
+                                        <div style="font-size:15px;line-height:26px;color:#DC2626;"> Never share this
+                                            OTP with anyone. </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr> <!-- Quote -->
+                    <tr>
+                        <td style="padding:20px 36px 8px 36px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="background-color:#F8FAFC;border:1px solid #E5E7EB;border-radius:12px;">
+                                <tr>
+                                    <td style="padding:26px 26px;">
+                                        <div
+                                            style="font-size:18px;line-height:32px;color:#1E293B;font-style:italic;text-align:center;">
+                                            “Great investments grow with patience, consistency, and trust.” </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr> <!-- Security -->
+                    <tr>
+                        <td style="padding:20px 36px 32px 36px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                                style="background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;">
+                                <tr>
+                                    <td style="padding:28px;">
+                                        <div style="font-size:18px;font-weight:700;color:#1E293B;"> Account Security
+                                        </div>
+                                        <div style="height:18px;">&nbsp;</div>
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+                                            width="100%">
+                                            <tr>
+                                                <td valign="top" width="20"
+                                                    style="font-size:16px;color:#16A34A;line-height:28px;">✓</td>
+                                                <td style="font-size:15px;line-height:28px;color:#64748B;"> This OTP was
+                                                    requested for your Arthmount account. </td>
+                                            </tr>
+                                            <tr>
+                                                <td valign="top" width="20"
+                                                    style="font-size:16px;color:#16A34A;line-height:28px;">✓</td>
+                                                <td style="font-size:15px;line-height:28px;color:#64748B;"> Ignore this
+                                                    email if you did not request it. </td>
+                                            </tr>
+                                            <tr>
+                                                <td valign="top" width="20"
+                                                    style="font-size:16px;color:#16A34A;line-height:28px;">✓</td>
+                                                <td style="font-size:15px;line-height:28px;color:#64748B;"> Arthmount
+                                                    will never ask for your OTP. </td>
+                                            </tr>
+                                            <tr>
+                                                <td valign="top" width="20"
+                                                    style="font-size:16px;color:#16A34A;line-height:28px;">✓</td>
+                                                <td style="font-size:15px;line-height:28px;color:#64748B;"> Keep your
+                                                    account credentials confidential. </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr> <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 36px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="border-top:1px solid #E5E7EB;font-size:1px;line-height:1px;">&nbsp;</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr> <!-- Footer -->
+                    <tr>
+                        <td bgcolor="#F8FAFC" style="padding:34px 36px;">
+                            <div style="font-size:18px;font-weight:700;color:#1E293B;text-align:center;"> Thank you for
+                                choosing Arthmount. </div>
+                            <div style="height:14px;">&nbsp;</div>
+                            <div style="font-size:15px;line-height:28px;color:#64748B;text-align:center;"> Building
+                                wealth through secure, trusted, and disciplined investing. </div>
+                            <div style="height:28px;">&nbsp;</div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <div style="font-size:14px;line-height:26px;color:#64748B;"> Support:
+                                            support@arthmount.com </div>
+                                        <div style="font-size:14px;line-height:26px;color:#64748B;"> Website:
+                                            arthmount.vercel.app </div>
+                                        <div style="font-size:14px;line-height:26px;color:#64748B;"> Privacy Policy
+                                            &nbsp;|&nbsp; Terms &amp; Conditions </div>
+                                        <div style="height:18px;">&nbsp;</div>
+                                        <div style="font-size:13px;line-height:24px;color:#94A3B8;"> This is an
+                                            automated email. Please do not reply. </div>
+                                        <div style="height:12px;">&nbsp;</div>
+                                        <div style="font-size:13px;line-height:24px;color:#94A3B8;"> &copy; {{year}}
+                                            Arthmount. All rights reserved. </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+                <div style="height:24px;line-height:24px;">&nbsp;</div>
+            </td>
+        </tr>
+    </table>
 </body>
+
 </html>

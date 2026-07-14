@@ -167,6 +167,59 @@ export async function fetchSignedUrl(key: string): Promise<string> {
   return r.data.data.url;
 }
 
+// ─── Analytics (premium dashboard) ───────────────────────────────────────────
+
+export type AnalyticsRange = "today" | "week" | "15days" | "month" | "3months" | "6months" | "year";
+
+export interface AnalyticsKpis {
+  totalPortfolio:   number;
+  activeCapital:    number;
+  walletLiquidity:  number;
+  investedBalance:  number;
+  todayProfit:      number;
+  depositsCurrent:  number;
+  portfolioChange:  number;
+  capitalChange:    number;
+  profitChange:     number;
+  todayProfitChange: number;
+}
+
+export interface CapitalHealthPoint { date: string; invested: number; withdrawn: number }
+export interface PackageCapital     { package: string; amount: number; count: number }
+export interface PackageProfit      { package: string; profit: number; count: number }
+
+export interface ActivityItem {
+  id:        string;
+  type:      "investment" | "deposit" | "withdrawal" | "audit";
+  userName:  string;
+  action:    string;
+  amount:    number | null;
+  timestamp: string;
+  status:    "success" | "pending" | "info";
+  meta?:     string;
+}
+
+export interface AnalyticsPayload {
+  kpis:             AnalyticsKpis;
+  capitalHealth:    CapitalHealthPoint[];
+  capitalByPackage: PackageCapital[];
+  profitByPackage:  PackageProfit[];
+  liveActivity:     ActivityItem[];
+}
+
+export function useAdminAnalytics(range: AnalyticsRange) {
+  return useQuery({
+    queryKey: ["admin", "analytics", range],
+    queryFn: async () => {
+      const r = await apiClient.get<ApiSuccess<AnalyticsPayload>>(`/admin/analytics?range=${range}`);
+      return r.data.data;
+    },
+    staleTime: 30_000,
+    retry: false,
+    refetchInterval: 60_000,
+  });
+}
+
 // ─── Audit logs ───────────────────────────────────────────────────────────────
 
 export function useAuditLogs(page: number) {
