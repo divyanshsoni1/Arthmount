@@ -50,7 +50,7 @@ const sendOtpSchema = z.object({
   signupToken: z.string().min(1),
   phone: z
     .string()
-    .regex(/^91\d{10}$/, "Enter a valid 10-digit Indian phone number"),
+    .regex(/^\d{10}$/, "Enter a valid 10-digit Indian phone number"),
 });
 
 export async function handleSignupSendOtp(req: NextRequest): Promise<NextResponse> {

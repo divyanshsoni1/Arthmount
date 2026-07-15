@@ -24,6 +24,7 @@ import {
   useFpVerifyEmailOtp,
   useFpResetPassword,
 } from "@/api-client/auth";
+import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
@@ -39,15 +40,10 @@ const STEP_META: { id: Step; label: string; icon: React.ElementType }[] = [
 
 function StepBar({ current, hasEmail }: { current: Step; hasEmail: boolean }) {
   const steps = hasEmail ? STEP_META : STEP_META.filter((s) => s.id !== 3);
-  const visibleId = (s: (typeof STEP_META)[number]) => {
-    if (!hasEmail && s.id === 4) return 3;
-    return s.id;
-  };
 
   return (
     <div className="flex items-center gap-2 mb-8">
       {steps.map((s, idx) => {
-        const vid    = visibleId(s);
         const done   = current > s.id;
         const active = current === s.id;
         const Icon   = s.icon;
@@ -235,7 +231,9 @@ export default function ForgotPasswordPage() {
   });
 
   const resetPassword = useFpResetPassword(passwordForm.setError, () => {
-    // redirect handled inside hook
+    // Hard-navigate so the session cookie issued by /api/auth/forgot/reset-password
+    // is flushed before the proxy evaluates the next request.
+    window.location.replace(getDashboardRoute("USER"));
   });
 
   // ─── back button ──────────────────────────────────────────────────────────

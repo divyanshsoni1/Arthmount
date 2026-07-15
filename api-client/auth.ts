@@ -1,9 +1,7 @@
 import { apiClient } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { UseFormSetError } from "react-hook-form";
 import { z } from "zod";
-import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Phone normalisation ──────────────────────────────────────────────────────
 
@@ -116,12 +114,16 @@ export const useLogin = (
 
 // ─── useVerifyOtp ─────────────────────────────────────────────────────────────
 
+/**
+ * Mutation for OTP verification.
+ * Navigation after success is the caller's responsibility — this hook only
+ * handles the API call and error mapping. It never imports or calls useRouter,
+ * window.location, or any other navigation primitive.
+ */
 export const useVerifyOtp = (
   setError: UseFormSetError<{ code: string }>,
   onSuccess?: (data: VerifyOtpResponseData) => void
 ) => {
-  const router = useRouter();
-
   return useMutation({
     mutationKey: ["verify_otp"],
     mutationFn: async (values: VerifyOtpFormValues) => {
@@ -132,15 +134,8 @@ export const useVerifyOtp = (
       return response.data.data;
     },
     onSuccess: (data) => {
+      // Deliver the result to the component. Navigation happens there.
       onSuccess?.(data);
-      // Clean up the OTP context stored for this sign-in attempt
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem("otp_token");
-        sessionStorage.removeItem("otp_channel");
-        sessionStorage.removeItem("otp_destination");
-      }
-      // Route to the correct dashboard based on the authenticated user's role
-      router.replace(getDashboardRoute(data.user.role));
     },
     onError: (error: unknown) => {
       const msg = extractApiError(error);
@@ -152,9 +147,7 @@ export const useVerifyOtp = (
           setError("code", { message: "OTP has expired. Please log in again." });
           break;
         case "OTP_LOCKED":
-          setError("code", {
-            message: "Too many incorrect attempts. Please log in again.",
-          });
+          setError("code", { message: "Too many incorrect attempts. Please log in again." });
           break;
         case "OTP_TOKEN_EXPIRED":
           setError("code", { message: "Session expired. Please log in again." });
@@ -210,7 +203,7 @@ export const signupPhoneSchema = z.object({
     .string()
     .min(1, "Phone number is required")
     .transform((v) => normalizePhone(v))
-    .refine((v) => /^91\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
+    .refine((v) => /^\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
 });
 export type SignupPhoneValues = z.infer<typeof signupPhoneSchema>;
 
@@ -314,12 +307,14 @@ export const useSignupVerifyOtp = (
 
 // ─── useSignupComplete ────────────────────────────────────────────────────────
 
+/**
+ * Mutation for completing signup (step 4 — set password).
+ * Navigation after success is the caller's responsibility.
+ */
 export const useSignupComplete = (
   setError: UseFormSetError<SignupPasswordValues>,
   onSuccess: (data: SignupCompleteData) => void
 ) => {
-  const router = useRouter();
-
   return useMutation({
     mutationKey: ["signup_complete"],
     mutationFn: async (payload: { signupToken: string; password: string }) => {
@@ -330,9 +325,8 @@ export const useSignupComplete = (
       return res.data.data;
     },
     onSuccess: (data) => {
+      // Deliver the result to the component. Navigation happens there.
       onSuccess(data);
-      // New signups are always USER role
-      router.replace(getDashboardRoute(data.user.role));
     },
     onError: (err: unknown) => {
       const msg = extractApiError(err);
@@ -364,7 +358,7 @@ export const fpPhoneSchema = z.object({
     .string()
     .min(1, "Phone number is required")
     .transform((v) => normalizePhone(v))
-    .refine((v) => /^91\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
+    .refine((v) => /^\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
 });
 export type FpPhoneValues = z.infer<typeof fpPhoneSchema>;
 
@@ -492,11 +486,14 @@ export const useFpVerifyEmailOtp = (
 
 // ─── useFpResetPassword ───────────────────────────────────────────────────────
 
+/**
+ * Mutation for resetting the password (final forgot-password step).
+ * Navigation after success is the caller's responsibility.
+ */
 export const useFpResetPassword = (
   setError: UseFormSetError<FpPasswordValues>,
   onSuccess: () => void
 ) => {
-  const router = useRouter();
   return useMutation({
     mutationKey: ["fp_reset_password"],
     mutationFn: async (payload: { forgotToken: string; password: string }) => {
@@ -507,9 +504,8 @@ export const useFpResetPassword = (
       return res.data.data;
     },
     onSuccess: () => {
+      // Deliver the result to the component. Navigation happens there.
       onSuccess();
-      // After password reset, user is re-authenticated as USER role
-      router.replace(getDashboardRoute("USER"));
     },
     onError: (err: unknown) => {
       setError("password", { message: extractApiError(err).message });

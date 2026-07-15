@@ -78,7 +78,7 @@ const phoneSchema = z.object({
     .string()
     .min(1, "Phone number is required")
     .transform((v) => normalizePhone(v))
-    .refine((v) => /^91\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
+    .refine((v) => /^\d{10}$/.test(v), "Enter a valid 10-digit Indian phone number"),
 });
 type PhoneValues = z.infer<typeof phoneSchema>;
 

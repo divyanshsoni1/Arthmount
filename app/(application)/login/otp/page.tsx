@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup } from "@/components/ui/field";
 import { AuthLayout } from "@/components/auth-layout";
 import { VerifyOtpFormValues, verifyOtpSchema, useVerifyOtp } from "@/api-client/auth";
+import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Countdown timer ──────────────────────────────────────────────────────────
 
@@ -37,23 +38,36 @@ export default function OtpPage() {
   const [channel,       setChannel]       = useState<"email" | "phone">("email");
   const [maskedDest,    setMaskedDest]    = useState("");
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  // `ready` gates rendering until the client has read sessionStorage.
+  // Without this flag, the SSR pass (where sessionStorage is undefined)
+  // renders an empty otpToken and the form submits a blank token on mount.
+  const [ready,         setReady]         = useState(false);
 
   const countdown   = useCountdown(30);
   const inputRefs   = useRef<Array<HTMLInputElement | null>>([]);
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
 
-  // ── Load context from sessionStorage ──
+  // ── Load context from sessionStorage (client-only, after hydration) ──
 
   useEffect(() => {
+    // This effect runs exactly once, after the component mounts on the client.
+    // sessionStorage is not available during SSR, so we must not read it until
+    // here — doing so during render would cause a hydration mismatch.
     const token = sessionStorage.getItem("otp_token")       ?? "";
     const ch    = sessionStorage.getItem("otp_channel")     ?? "email";
     const dest  = sessionStorage.getItem("otp_destination") ?? "";
 
-    if (!token) { router.replace("/login"); return; }
+    if (!token) {
+      // No OTP context — user likely refreshed or navigated here directly.
+      // Redirect back to login so they can start a fresh login attempt.
+      router.replace("/login");
+      return;
+    }
 
     setOtpToken(token);
     setChannel(ch as "email" | "phone");
     setMaskedDest(dest);
+    setReady(true);
   }, [router]);
 
   // ── Form ──
@@ -68,7 +82,18 @@ export default function OtpPage() {
     form.setValue("otpToken", otpToken);
   }, [otpToken, form]);
 
-  const { mutateAsync, isPending } = useVerifyOtp(form.setError);
+  const { mutateAsync, isPending } = useVerifyOtp(form.setError, (data) => {
+    // Clean up the OTP context stored for this sign-in attempt.
+    sessionStorage.removeItem("otp_token");
+    sessionStorage.removeItem("otp_channel");
+    sessionStorage.removeItem("otp_destination");
+    // Hard-navigate so the browser flushes the Set-Cookie from the
+    // verify-otp response before the next request hits the proxy.
+    // router.replace() is a client-side transition that can race the cookie
+    // write; window.location.replace() forces a full HTTP round-trip so the
+    // proxy always sees the fresh session cookie.
+    window.location.replace(getDashboardRoute(data.user.role));
+  });
 
   const onSubmit = (values: VerifyOtpFormValues) => mutateAsync(values);
 
@@ -111,6 +136,19 @@ export default function OtpPage() {
   };
 
   const ChannelIcon = channel === "phone" ? MessageCircle : Mail;
+
+  // Don't render the form until sessionStorage has been read on the client.
+  // This prevents the OTP form from mounting with an empty token and
+  // accidentally firing a submission or showing a blank destination.
+  if (!ready) {
+    return (
+      <AuthLayout>
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-primary opacity-60" />
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>

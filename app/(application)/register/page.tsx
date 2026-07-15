@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Eye,
@@ -32,6 +31,7 @@ import {
   useSignupVerifyOtp,
   useSignupComplete,
 } from "@/api-client/auth";
+import { getDashboardRoute } from "@/lib/routing";
 
 // ─── Step metadata ────────────────────────────────────────────────────────────
 
@@ -155,8 +155,6 @@ function StepBar({ current }: { current: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
-  const router = useRouter();
-
   const [step,        setStep]        = useState<1 | 2 | 3 | 4>(1);
   const [signupToken, setSignupToken] = useState("");
   const [maskedPhone, setMaskedPhone] = useState("");
@@ -232,8 +230,10 @@ export default function RegisterPage() {
     mode: "onTouched",
   });
 
-  const completeMutation = useSignupComplete(passwordForm.setError, () => {
-    // router.replace("/dashboard") is handled inside useSignupComplete
+  const completeMutation = useSignupComplete(passwordForm.setError, (data) => {
+    // Hard-navigate so the session cookie issued by /api/auth/signup/complete
+    // is flushed before the proxy evaluates the next request.
+    window.location.replace(getDashboardRoute(data.user.role));
   });
 
   // ─── Render ───────────────────────────────────────────────────────────────

@@ -289,7 +289,7 @@ export async function sendPhoneOtp(
 ): Promise<SendOtpResult> {
   const phone = normalizePhone(newPhone);
 
-  if (!/^91\d{10}$/.test(phone)) {
+  if (!/^\d{10}$/.test(phone)) {
     throw new ProfileError(
       "Enter a valid 10-digit Indian phone number.",
       "VALIDATION_ERROR"
