@@ -12,8 +12,12 @@ import {
   FileCheck,
   LayoutDashboard,
   LogOut,
+  Receipt,
   TrendingUp,
   Wallet,
+  ArrowUpRight,
+  User,
+  Bell,
 } from "lucide-react";
 
 import type { AuthUser } from "@/api-client/user";
@@ -21,12 +25,15 @@ import { useLogout }    from "@/api-client/user";
 import { UserAvatar }   from "./UserAvatar";
 import { getDashboardRoute, isAdminRole } from "@/lib/routing";
 
-// User-role menu items
+// User-role menu items — Transaction History is only in this list (not admin)
 const USER_MENU_ITEMS = [
-  { label: "Dashboard",            href: "/dashboard",       icon: LayoutDashboard },
-  { label: "Add Money to Wallet",  href: "/dashboard/wallet", icon: Wallet         },
-  { label: "Investing",            href: "/investing",       icon: TrendingUp      },
-  { label: "Upload KYC Documents", href: "/dashboard/kyc",   icon: FileCheck       },
+  { label: "Profile",             href: "/dashboard/profile",       icon: User            },
+  { label: "Invest Now",          href: "/dashboard/invest",        icon: TrendingUp      },
+  { label: "My Investments",      href: "/dashboard/my-investments", icon: LayoutDashboard },
+  { label: "Withdraw Money",      href: "/dashboard/withdraw",      icon: ArrowUpRight    },
+  { label: "Transaction History", href: "/dashboard/transactions",  icon: Receipt         },
+  { label: "KYC Verification",    href: "/dashboard/kyc",           icon: FileCheck       },
+  { label: "Wallet",              href: "/dashboard/wallet",        icon: Wallet          },
 ] as const;
 
 // Admin-role menu items
@@ -190,7 +197,7 @@ export function UserDropdown({ user }: UserDropdownProps) {
         <div className="p-2">
           {MENU_ITEMS.map(({ label, href, icon: Icon }) => (
             <Link
-              key={href}
+              key={label}
               href={href}
               role="menuitem"
               tabIndex={open ? 0 : -1}

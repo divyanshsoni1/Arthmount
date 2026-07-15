@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useUser, useLogout } from "@/api-client/user";
 import { useDashboard }       from "@/api-client/dashboard";
+import { isAdminRole }        from "@/lib/routing";
 
 // ─── Navigation structure ─────────────────────────────────────────────────────
 
@@ -33,9 +34,9 @@ const NAV_SECTIONS = [
   {
     label: "Wallet",
     items: [
-      { label: "Wallet & Add Money",  href: "/dashboard/wallet", icon: Wallet     },
-      { label: "Withdraw Money",      href: "/dashboard/withdraw", icon: ArrowUpCircle },
-      { label: "Transaction History", href: "/dashboard/wallet", icon: Receipt    },
+      { label: "Wallet & Add Money",  href: "/dashboard/wallet",        icon: Wallet        },
+      { label: "Withdraw Money",      href: "/dashboard/withdraw",      icon: ArrowUpCircle },
+      { label: "Transaction History", href: "/dashboard/transactions",  icon: Receipt       },
     ],
   },
   {
@@ -247,37 +248,49 @@ export default function AppNavbar() {
 
         {/* Nav sections */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label}>
-              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                {section.label}
-              </p>
-              <div className="space-y-0.5">
-                {section.items.map(({ label, href, icon: Icon }) => {
-                  const active = pathname === href;
-                  return (
-                    <Link
-                      key={label}
-                      href={href}
-                      onClick={() => setOpen(false)}
-                      className={[
-                        "group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
-                        active
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                      ].join(" ")}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Icon size={16} className={active ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-600"} />
-                        {label}
-                      </span>
-                      {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
-                    </Link>
-                  );
-                })}
+          {NAV_SECTIONS.map((section) => {
+            // Filter items that require a non-admin (regular user) role
+            const visibleItems = section.items.filter(({ label }) => {
+              if (label === "Transaction History") return user ? !isAdminRole(user.role) : false;
+              return true;
+            });
+            if (visibleItems.length === 0) return null;
+            return (
+              <div key={section.label}>
+                <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {section.label}
+                </p>
+                <div className="space-y-0.5">
+                  {visibleItems.map(({ label, href, icon: Icon }) => {
+                    // Use startsWith for nested routes but require exact match for /dashboard
+                    const active =
+                      href === "/dashboard"
+                        ? pathname === "/dashboard"
+                        : pathname === href || pathname.startsWith(href + "/");
+                    return (
+                      <Link
+                        key={label}
+                        href={href}
+                        onClick={() => setOpen(false)}
+                        className={[
+                          "group flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150",
+                          active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                        ].join(" ")}
+                      >
+                        <span className="flex items-center gap-3">
+                          <Icon size={16} className={active ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-600"} />
+                          {label}
+                        </span>
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Footer actions */}
