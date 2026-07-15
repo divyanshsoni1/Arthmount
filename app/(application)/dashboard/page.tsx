@@ -443,10 +443,10 @@ export default function DashboardPage() {
         <h3 className="text-sm font-bold text-slate-800 mb-3">Quick Actions</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Add Money",  href: "/dashboard/wallet", icon: Plus,        cls: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20" },
-            { label: "KYC Verify", href: "/dashboard/kyc",    icon: FileCheck,   cls: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20"          },
-            { label: "Wallet",     href: "/dashboard/wallet", icon: Wallet,      cls: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"               },
-            { label: "History",    href: "/dashboard/wallet", icon: ArrowRight,  cls: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"               },
+            { label: "Add Money",     href: "/dashboard/wallet",   icon: Plus,        cls: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-600/20" },
+            { label: "Withdraw",      href: "/dashboard/withdraw", icon: ArrowUpRight, cls: "bg-orange-500 text-white hover:bg-orange-600 shadow-sm shadow-orange-500/20"    },
+            { label: "Invest Now",    href: "/dashboard/invest",   icon: TrendingUp,   cls: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-600/20"          },
+            { label: "KYC Verify",    href: "/dashboard/kyc",      icon: FileCheck,    cls: "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"               },
           ].map(({ label, href, icon: Icon, cls }) => (
             <Link key={label} href={href}
               className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${cls}`}>

@@ -232,3 +232,178 @@ export function useAuditLogs(page: number) {
     staleTime: 30_000, retry: false,
   });
 }
+
+// ─── Admin Withdrawal Management ──────────────────────────────────────────────
+
+export type AdminWithdrawalStatus =
+  | "PENDING" | "APPROVED" | "PROCESSING"
+  | "COMPLETED" | "REJECTED" | "FAILED" | "CANCELLED";
+
+export type AdminWithdrawalMethod = "BANK" | "UPI";
+
+export interface AdminWithdrawalUser {
+  id:          string;
+  name:        string;
+  email:       string | null;
+  phone:       string | null;
+  kycStatus:   string;
+  isFrozen:    boolean;
+  mainBalance: string;
+  createdAt:   string;
+}
+
+export interface AdminWithdrawalRow {
+  id:                   string;
+  userId:               string;
+  amount:               string;
+  fee:                  string;
+  tax:                  string;
+  netAmount:            string;
+  method:               AdminWithdrawalMethod;
+  accountHolderName:    string | null;
+  bankName:             string | null;
+  accountNumber:        string | null;
+  ifscCode:             string | null;
+  upiId:                string | null;
+  transactionReference: string | null;
+  status:               AdminWithdrawalStatus;
+  rejectionReason:      string | null;
+  approvedById:         string | null;
+  requestedAt:          string;
+  approvedAt:           string | null;
+  processedAt:          string | null;
+  remarks:              string | null;
+  createdAt:            string;
+  updatedAt:            string;
+  user:                 AdminWithdrawalUser;
+  approvedBy:           { id: string; name: string } | null;
+}
+
+export interface AdminWithdrawalListResult {
+  records: AdminWithdrawalRow[];
+  total:   number;
+  page:    number;
+  pages:   number;
+}
+
+export interface AdminWithdrawalStats {
+  total:      number;
+  pending:    { count: number; amount: number };
+  processing: { count: number; amount: number };
+  completed:  { count: number; amount: number };
+  rejected:   { count: number; amount: number };
+  cancelled:  { count: number; amount: number };
+  failed:     { count: number; amount: number };
+  totalAmount: number;
+  todayCount:  number;
+  todayAmount: number;
+  monthCount:  number;
+  monthAmount: number;
+}
+
+export interface AdminWithdrawalListParams {
+  page?:       number;
+  limit?:      number;
+  status?:     string;
+  method?:     string;
+  search?:     string;
+  dateFrom?:   string;
+  dateTo?:     string;
+  minAmount?:  number;
+  maxAmount?:  number;
+  order?:      "asc" | "desc";
+}
+
+// ── Query keys ─────────────────────────────────────────────────────────────────
+export const ADMIN_WITHDRAWALS_KEY  = (params: AdminWithdrawalListParams) =>
+  ["admin", "withdrawals", "list", params] as const;
+export const ADMIN_WITHDRAWAL_STATS_KEY = ["admin", "withdrawals", "stats"] as const;
+export const ADMIN_WITHDRAWAL_DETAIL_KEY = (id: string) =>
+  ["admin", "withdrawals", "detail", id] as const;
+
+// ── useAdminWithdrawalStats ────────────────────────────────────────────────────
+export function useAdminWithdrawalStats() {
+  return useQuery<AdminWithdrawalStats>({
+    queryKey: ADMIN_WITHDRAWAL_STATS_KEY,
+    queryFn:  async () => {
+      const r = await apiClient.get<ApiSuccess<AdminWithdrawalStats>>(
+        "/admin/withdrawals/stats"
+      );
+      return r.data.data;
+    },
+    staleTime: 30_000,
+    retry: false,
+    refetchInterval: 60_000,
+  });
+}
+
+// ── useAdminWithdrawals ────────────────────────────────────────────────────────
+export function useAdminWithdrawals(params: AdminWithdrawalListParams = {}) {
+  return useQuery<AdminWithdrawalListResult>({
+    queryKey: ADMIN_WITHDRAWALS_KEY(params),
+    queryFn:  async () => {
+      const p = new URLSearchParams();
+      if (params.page)      p.set("page",      String(params.page));
+      if (params.limit)     p.set("limit",     String(params.limit));
+      if (params.status && params.status !== "ALL") p.set("status", params.status);
+      if (params.method && params.method !== "ALL") p.set("method", params.method);
+      if (params.search)    p.set("search",    params.search);
+      if (params.dateFrom)  p.set("dateFrom",  params.dateFrom);
+      if (params.dateTo)    p.set("dateTo",    params.dateTo);
+      if (params.minAmount !== undefined) p.set("minAmount", String(params.minAmount));
+      if (params.maxAmount !== undefined) p.set("maxAmount", String(params.maxAmount));
+      if (params.order)     p.set("order",     params.order);
+      const r = await apiClient.get<ApiSuccess<AdminWithdrawalListResult>>(
+        `/admin/withdrawals?${p.toString()}`
+      );
+      return r.data.data;
+    },
+    staleTime: 20_000,
+    retry: false,
+  });
+}
+
+// ── useAdminWithdrawalDetail ───────────────────────────────────────────────────
+export function useAdminWithdrawalDetail(id: string) {
+  return useQuery<AdminWithdrawalRow>({
+    queryKey: ADMIN_WITHDRAWAL_DETAIL_KEY(id),
+    queryFn:  async () => {
+      const r = await apiClient.get<ApiSuccess<{ withdrawal: AdminWithdrawalRow }>>(
+        `/admin/withdrawals/${id}`
+      );
+      return r.data.data.withdrawal;
+    },
+    enabled:   !!id,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+// ── useAdminWithdrawalAction ───────────────────────────────────────────────────
+export type WithdrawalAction = "APPROVED" | "PROCESSING" | "COMPLETED" | "REJECTED";
+
+export function useAdminWithdrawalAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["admin", "withdrawals", "action"],
+    mutationFn:  async ({
+      id, action, rejectionReason,
+    }: {
+      id:               string;
+      action:           WithdrawalAction;
+      rejectionReason?: string;
+    }) => {
+      const r = await apiClient.patch<ApiSuccess<{ withdrawal: AdminWithdrawalRow }>>(
+        `/admin/withdrawals/${id}`,
+        { action, rejectionReason }
+      );
+      return r.data.data.withdrawal;
+    },
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ADMIN_WITHDRAWAL_STATS_KEY });
+      qc.invalidateQueries({ queryKey: ["admin", "withdrawals", "list"] });
+      qc.invalidateQueries({ queryKey: ADMIN_WITHDRAWAL_DETAIL_KEY(id) });
+      qc.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+}

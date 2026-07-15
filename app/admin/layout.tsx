@@ -7,7 +7,7 @@ import {
   BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardList,
   FileCheck, LayoutDashboard, LogOut, Menu, Shield,
   Users, X, TrendingUp, Settings, Search, Activity,
-  CircleDot, Package,
+  CircleDot, Package, ArrowUpRight,
 } from "lucide-react";
 import { useUser, useLogout } from "@/api-client/user";
 
@@ -24,10 +24,11 @@ const NAV_GROUPS = [
   {
     label: "Management",
     items: [
-      { label: "Users",        href: "/admin/users",      icon: Users,       exact: false },
-      { label: "KYC Requests", href: "/admin/kyc",        icon: FileCheck,   exact: false },
-      { label: "Packages",          href: "/admin/packages",         icon: Package,      exact: false },
-      { label: "Trading Calendar",  href: "/admin/trading-calendar", icon: CalendarDays, exact: false },
+      { label: "Users",               href: "/admin/users",             icon: Users,          exact: false },
+      { label: "KYC Requests",        href: "/admin/kyc",               icon: FileCheck,      exact: false },
+      { label: "Withdrawals",         href: "/admin/withdrawals",       icon: ArrowUpRight,   exact: false },
+      { label: "Packages",            href: "/admin/packages",          icon: Package,        exact: false },
+      { label: "Trading Calendar",    href: "/admin/trading-calendar",  icon: CalendarDays,   exact: false },
     ],
   },
   {

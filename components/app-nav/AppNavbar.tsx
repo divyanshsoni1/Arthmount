@@ -34,7 +34,7 @@ const NAV_SECTIONS = [
     label: "Wallet",
     items: [
       { label: "Wallet & Add Money",  href: "/dashboard/wallet", icon: Wallet     },
-      { label: "Withdraw Money",      href: "/dashboard/wallet", icon: ArrowUpCircle },
+      { label: "Withdraw Money",      href: "/dashboard/withdraw", icon: ArrowUpCircle },
       { label: "Transaction History", href: "/dashboard/wallet", icon: Receipt    },
     ],
   },
