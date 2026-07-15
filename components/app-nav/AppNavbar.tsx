@@ -26,8 +26,8 @@ const NAV_SECTIONS = [
   {
     label: "Invest",
     items: [
-      { label: "Invest Now",     href: "/dashboard",         icon: TrendingUp     },
-      { label: "My Investments", href: "/dashboard",         icon: BarChart3      },
+      { label: "Invest Now",     href: "/dashboard/invest",  icon: TrendingUp     },
+      { label: "My Investments", href: "/dashboard/my-investments", icon: BarChart3 },
     ],
   },
   {
