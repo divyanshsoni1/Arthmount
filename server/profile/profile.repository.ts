@@ -3,8 +3,9 @@
  * Never pulls more fields than the profile layer needs.
  */
 
-import { prisma } from "@/lib/prisma";
-import type { User } from "@/lib/generated/prisma/client";
+import { prisma }                          from "@/lib/prisma";
+import { Gender, MaritalStatus }           from "@/lib/generated/prisma/client";
+import type { User }                       from "@/lib/generated/prisma/client";
 
 // ─── Projection ───────────────────────────────────────────────────────────────
 
@@ -136,6 +137,24 @@ export async function updateUserName(userId: string, name: string): Promise<void
   await prisma.user.update({
     where: { id: userId },
     data:  { name, updatedAt: new Date() },
+  });
+}
+
+// ─── Update personal info (dob, gender, maritalStatus) ───────────────────────
+
+export interface PersonalInfoUpdate {
+  dob?:           Date | null;
+  gender?:        Gender | null;
+  maritalStatus?: MaritalStatus | null;
+}
+
+export async function updatePersonalInfo(
+  userId: string,
+  data:   PersonalInfoUpdate
+): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data:  { ...data, updatedAt: new Date() },
   });
 }
 

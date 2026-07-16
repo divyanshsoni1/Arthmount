@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import Link        from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Menu, X, Bell, Wallet, Home, LayoutDashboard,
+  Menu, X, Bell, Wallet, Home,
   TrendingUp, Receipt, ArrowDownCircle, ArrowUpCircle,
-  FileCheck, BarChart3, FileText, Settings, LogOut,
+  FileCheck, BarChart3, Settings, LogOut,
   ChevronRight, HelpCircle, Star, Zap,
   CircleDollarSign, User,
 } from "lucide-react";
@@ -21,7 +21,6 @@ const NAV_SECTIONS = [
     label: "Main",
     items: [
       { label: "Home",           href: "/dashboard",         icon: Home           },
-      { label: "Portfolio",      href: "/dashboard",         icon: LayoutDashboard },
     ],
   },
   {
@@ -42,10 +41,8 @@ const NAV_SECTIONS = [
   {
     label: "Account",
     items: [
-      { label: "My Profile",       href: "/dashboard/profile",            icon: User           },
       { label: "KYC Verification", href: "/dashboard/kyc",                icon: FileCheck      },
       { label: "Profit Analytics", href: "/dashboard/profit-analytics",   icon: CircleDollarSign },
-      { label: "Reports",          href: "/dashboard",                    icon: FileText       },
       { label: "Settings",         href: "/dashboard",                    icon: Settings       },
     ],
   },

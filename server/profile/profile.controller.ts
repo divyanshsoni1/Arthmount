@@ -13,6 +13,7 @@ import {
   ProfileError,
   getFullProfile,
   updateName,
+  updatePersonalInfoService,
   sendEmailOtp,
   verifyEmailOtp,
   sendPhoneOtp,
@@ -215,6 +216,42 @@ export async function handleVerifyPhoneOtp(req: NextRequest): Promise<NextRespon
 
     await verifyPhoneOtp(userId, parsed.data.code);
     return successResponse({ message: "Phone number updated successfully." });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// ─── PATCH /api/user/profile/personal-info  (dob, gender, maritalStatus) ─────
+
+const updatePersonalInfoSchema = z.object({
+  dob:           z.string().nullable().optional(),
+  gender:        z.string().nullable().optional(),
+  maritalStatus: z.string().nullable().optional(),
+}).refine(
+  (d) => "dob" in d || "gender" in d || "maritalStatus" in d,
+  { message: "Provide at least one field to update." }
+);
+
+export async function handleUpdatePersonalInfo(req: NextRequest): Promise<NextResponse> {
+  try {
+    const userId = await requireAuth(req);
+
+    let body: unknown;
+    try { body = await req.json(); } catch {
+      return errorResponse("Invalid JSON body.", "BAD_REQUEST", 400);
+    }
+
+    const parsed = updatePersonalInfoSchema.safeParse(body);
+    if (!parsed.success) {
+      return errorResponse(
+        parsed.error.issues.map((e) => e.message).join(", "),
+        "VALIDATION_ERROR",
+        422
+      );
+    }
+
+    await updatePersonalInfoService(userId, parsed.data);
+    return successResponse({ message: "Personal information updated successfully." });
   } catch (err) {
     return handleError(err);
   }

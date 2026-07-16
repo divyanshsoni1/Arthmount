@@ -96,6 +96,32 @@ export function useUpdateName() {
   });
 }
 
+// ─── useUpdatePersonalInfo ────────────────────────────────────────────────────
+
+export interface PersonalInfoPayload {
+  dob?:           string | null;
+  gender?:        string | null;
+  maritalStatus?: string | null;
+}
+
+export function useUpdatePersonalInfo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationKey: ["profile", "updatePersonalInfo"],
+    mutationFn:  async (payload: PersonalInfoPayload) => {
+      const res = await apiClient.patch<ApiSuccess<{ message: string }>>(
+        "/user/profile/personal-info",
+        payload
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
+    },
+  });
+}
+
 // ─── useSendEmailOtp ──────────────────────────────────────────────────────────
 
 export interface SendOtpResult {

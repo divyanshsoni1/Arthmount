@@ -19,13 +19,17 @@ import {
   findProfileById,
   getProfileStats,
   updateUserName,
+  updatePersonalInfo,
   updateUserEmail,
   updateUserPhone,
   emailTakenByOther,
   phoneTakenByOther,
   type ProfileUser,
   type ProfileStats,
+  type PersonalInfoUpdate,
 } from "./profile.repository";
+
+import { Gender, MaritalStatus } from "@/lib/generated/prisma/client";
 
 import { redis }          from "@/lib/redis";
 import { enqueueOtpJob }  from "@/lib/otpQueue";
@@ -219,6 +223,84 @@ export async function updateName(userId: string, name: string): Promise<void> {
     );
   }
   await updateUserName(userId, trimmed);
+}
+
+// ─── Update personal info (dob, gender, maritalStatus) ───────────────────────
+
+const VALID_GENDERS = [
+  "MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY",
+] as const;
+
+const VALID_MARITAL_STATUSES = [
+  "SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "PREFER_NOT_TO_SAY",
+] as const;
+
+export interface PersonalInfoPayload {
+  dob?:           string | null;   // ISO date string YYYY-MM-DD
+  gender?:        string | null;
+  maritalStatus?: string | null;
+}
+
+export async function updatePersonalInfoService(
+  userId:  string,
+  payload: PersonalInfoPayload
+): Promise<void> {
+  const update: PersonalInfoUpdate = {};
+
+  if ("dob" in payload) {
+    if (payload.dob === null || payload.dob === "") {
+      update.dob = null;
+    } else if (payload.dob) {
+      const date = new Date(payload.dob);
+      if (isNaN(date.getTime())) {
+        throw new ProfileError("Invalid date of birth.", "VALIDATION_ERROR", 422);
+      }
+      // Must be in the past, user must be at least 18 years old
+      const now        = new Date();
+      const eighteenth = new Date(
+        now.getFullYear() - 18,
+        now.getMonth(),
+        now.getDate()
+      );
+      if (date > now) {
+        throw new ProfileError("Date of birth cannot be in the future.", "VALIDATION_ERROR", 422);
+      }
+      if (date > eighteenth) {
+        throw new ProfileError("You must be at least 18 years old.", "VALIDATION_ERROR", 422);
+      }
+      update.dob = date;
+    }
+  }
+
+  if ("gender" in payload) {
+    if (payload.gender === null || payload.gender === "") {
+      update.gender = null;
+    } else if (payload.gender) {
+      const g = payload.gender.toUpperCase();
+      if (!(VALID_GENDERS as readonly string[]).includes(g)) {
+        throw new ProfileError("Invalid gender value.", "VALIDATION_ERROR", 422);
+      }
+      update.gender = g as Gender;
+    }
+  }
+
+  if ("maritalStatus" in payload) {
+    if (payload.maritalStatus === null || payload.maritalStatus === "") {
+      update.maritalStatus = null;
+    } else if (payload.maritalStatus) {
+      const ms = payload.maritalStatus.toUpperCase();
+      if (!(VALID_MARITAL_STATUSES as readonly string[]).includes(ms)) {
+        throw new ProfileError("Invalid marital status value.", "VALIDATION_ERROR", 422);
+      }
+      update.maritalStatus = ms as MaritalStatus;
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new ProfileError("No fields to update.", "VALIDATION_ERROR", 422);
+  }
+
+  await updatePersonalInfo(userId, update);
 }
 
 // ─── Send Email OTP ───────────────────────────────────────────────────────────

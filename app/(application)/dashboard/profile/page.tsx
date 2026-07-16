@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  BadgeCheck,
   BarChart3,
   CalendarDays,
   Edit3,
   FileCheck,
   HelpCircle,
-  Lock,
   Mail,
   Receipt,
   Shield,
@@ -29,64 +27,69 @@ import { formatDate, formatDateTime } from "@/api-client/profile";
 import ProfileHeader, { ProfileHeaderSkeleton } from "@/components/profile/ProfileHeader";
 import { cn } from "@/lib/utils";
 
-// ─── Divider ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function Divider() {
-  return <div className="h-px bg-slate-100" />;
+function humanize(val: string | null | undefined): string | null {
+  if (!val) return null;
+  return val
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-// ─── Section wrapper ──────────────────────────────────────────────────────────
+// ─── Section card ─────────────────────────────────────────────────────────────
 
-function Section({
+function SectionCard({
   title,
   icon: Icon,
-  children,
   action,
+  children,
 }: {
-  title:     string;
-  icon:      React.ElementType;
-  children:  React.ReactNode;
-  action?:   React.ReactNode;
+  title:    string;
+  icon:     React.ElementType;
+  action?:  React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-      <div className="flex items-center justify-between gap-3 px-5 py-4">
-        <div className="flex items-center gap-2.5">
+    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+      <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+        <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100">
-            <Icon size={14} className="text-slate-500" />
+            <Icon size={13} className="text-slate-500" />
           </div>
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
         </div>
         {action}
       </div>
-      <Divider />
-      <div className="px-5">{children}</div>
+      <div className="h-px bg-slate-100" />
+      <div className="px-4 sm:px-5">{children}</div>
     </div>
   );
 }
 
-// ─── Info field row ───────────────────────────────────────────────────────────
+// ─── Info row ─────────────────────────────────────────────────────────────────
 
-function Field({
+function InfoRow({
   label,
   value,
-  missing,
   badge,
 }: {
   label:   string;
   value:   string | null | undefined;
-  missing?: boolean;
   badge?:  React.ReactNode;
 }) {
+  const isEmpty = !value;
   return (
-    <div className="flex items-center justify-between gap-4 py-3.5 border-b border-slate-50 last:border-0">
-      <p className="text-xs font-medium text-slate-400 shrink-0 w-32">{label}</p>
+    <div className="flex items-center justify-between gap-3 py-3 border-b border-slate-50 last:border-0">
+      <p className="text-xs font-medium text-slate-400 shrink-0 w-28">{label}</p>
       <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
         <p className={cn(
-          "text-sm font-medium text-right truncate",
-          missing || !value ? "italic text-slate-300" : "text-slate-700"
+          "text-sm text-right truncate",
+          isEmpty
+            ? "italic text-slate-300 font-normal"
+            : "font-medium text-slate-700"
         )}>
-          {value || "Not provided"}
+          {isEmpty ? "Not provided" : value}
         </p>
         {badge}
       </div>
@@ -96,19 +99,46 @@ function Field({
 
 // ─── Verified badge ───────────────────────────────────────────────────────────
 
-function VerifiedBadge({ verified }: { verified: boolean }) {
-  if (verified) {
-    return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-        <BadgeCheck size={9} />
-        Verified
-      </span>
-    );
-  }
+function VerifiedPill({ verified }: { verified: boolean }) {
   return (
-    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-50 border border-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-      Unverified
+    <span className={cn(
+      "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5",
+      "text-[10px] font-semibold",
+      verified
+        ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+        : "bg-amber-50 border-amber-100 text-amber-700"
+    )}>
+      {verified ? "Verified" : "Not set"}
     </span>
+  );
+}
+
+// ─── Contact row (value + pill) ───────────────────────────────────────────────
+
+function ContactRow({
+  label,
+  value,
+  verified,
+}: {
+  label:    string;
+  value:    string | null;
+  verified: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 border-b border-slate-50 last:border-0">
+      <p className="text-xs font-medium text-slate-400 shrink-0 w-28">{label}</p>
+      <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+        <p className={cn(
+          "text-sm text-right truncate",
+          !value
+            ? "italic text-slate-300 font-normal"
+            : "font-medium text-slate-700"
+        )}>
+          {value ?? "Not provided"}
+        </p>
+        <VerifiedPill verified={!!value} />
+      </div>
+    </div>
   );
 }
 
@@ -125,90 +155,77 @@ function SecurityRow({
   value:  string;
   status: "active" | "inactive" | "info";
 }) {
-  const dotCls = {
-    active:   "bg-emerald-400",
-    inactive: "bg-slate-300",
-    info:     "bg-blue-400",
-  }[status];
-
+  const dot = { active: "bg-emerald-400", inactive: "bg-slate-300", info: "bg-blue-400" }[status];
   return (
-    <div className="flex items-center gap-3 py-3.5 border-b border-slate-50 last:border-0">
+    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50">
-        <Icon size={14} className="text-slate-400" />
+        <Icon size={13} className="text-slate-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">{label}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
         <p className="mt-0.5 text-sm font-medium text-slate-700 truncate">{value}</p>
       </div>
-      <div className={cn("h-2 w-2 shrink-0 rounded-full", dotCls)} />
+      <div className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />
     </div>
   );
 }
 
-// ─── Quick link row ───────────────────────────────────────────────────────────
+// ─── Quick link ───────────────────────────────────────────────────────────────
 
-interface QuickLinkProps {
-  icon:  React.ElementType;
-  label: string;
-  sub:   string;
-  href:  string;
-  color?: "emerald" | "blue" | "violet" | "amber" | "slate";
-}
-
-const QL_ICON: Record<NonNullable<QuickLinkProps["color"]>, string> = {
+const QL_COLORS: Record<string, string> = {
+  slate:   "bg-slate-100 text-slate-500",
   emerald: "bg-emerald-50 text-emerald-600",
   blue:    "bg-blue-50 text-blue-600",
   violet:  "bg-violet-50 text-violet-600",
   amber:   "bg-amber-50 text-amber-600",
-  slate:   "bg-slate-50 text-slate-500",
 };
 
-function QuickLink({ icon: Icon, label, sub, href, color = "slate" }: QuickLinkProps) {
+function QuickLink({
+  icon: Icon,
+  label,
+  sub,
+  href,
+  color = "slate",
+}: {
+  icon:   React.ElementType;
+  label:  string;
+  sub:    string;
+  href:   string;
+  color?: keyof typeof QL_COLORS;
+}) {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3.5 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50/60 -mx-5 px-5 transition-colors duration-100"
+      className="group flex items-center gap-3.5 py-3 border-b border-slate-50 last:border-0 -mx-4 px-4 sm:-mx-5 sm:px-5 hover:bg-slate-50/70 transition-colors"
     >
-      <div className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-        QL_ICON[color]
-      )}>
+      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", QL_COLORS[color])}>
         <Icon size={16} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800 leading-snug">{label}</p>
+        <p className="text-sm font-medium text-slate-800">{label}</p>
         <p className="text-xs text-slate-400 truncate">{sub}</p>
       </div>
-      <ArrowRight
-        size={14}
-        className="shrink-0 text-slate-300 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-100"
-      />
+      <ArrowRight size={14} className="shrink-0 text-slate-300 group-hover:translate-x-0.5 group-hover:text-slate-400 transition-all" />
     </Link>
   );
 }
 
-// ─── KYC status inline banner ─────────────────────────────────────────────────
+// ─── KYC banner ───────────────────────────────────────────────────────────────
 
-const KYC_CFG: Record<string, { bg: string; text: string; sub: string; accent: string }> = {
-  PENDING:       { bg: "border-amber-100 bg-amber-50",     text: "text-amber-800",   sub: "Complete your KYC to unlock investing.",             accent: "text-amber-600" },
-  IN_REVIEW:     { bg: "border-blue-100 bg-blue-50",       text: "text-blue-800",    sub: "Documents under review — usually 1–2 business days.", accent: "text-blue-600"  },
-  APPROVED:      { bg: "border-emerald-100 bg-emerald-50", text: "text-emerald-800", sub: "Your identity is fully verified.",                    accent: "text-emerald-600" },
-  AUTO_APPROVED: { bg: "border-emerald-100 bg-emerald-50", text: "text-emerald-800", sub: "Your identity is fully verified.",                    accent: "text-emerald-600" },
-  REJECTED:      { bg: "border-red-100 bg-red-50",         text: "text-red-800",     sub: "KYC rejected — please re-submit your documents.",     accent: "text-red-600"   },
+const KYC_BANNER: Record<string, { bg: string; text: string; sub: string }> = {
+  PENDING:       { bg: "border-amber-100 bg-amber-50",     text: "text-amber-800",   sub: "Complete KYC to unlock investing." },
+  IN_REVIEW:     { bg: "border-blue-100 bg-blue-50",       text: "text-blue-800",    sub: "Under review — usually 1–2 business days." },
+  APPROVED:      { bg: "border-emerald-100 bg-emerald-50", text: "text-emerald-800", sub: "Your identity is fully verified." },
+  AUTO_APPROVED: { bg: "border-emerald-100 bg-emerald-50", text: "text-emerald-800", sub: "Your identity is fully verified." },
+  REJECTED:      { bg: "border-red-100 bg-red-50",         text: "text-red-800",     sub: "KYC rejected — please re-submit." },
 };
 
 function KycBanner({ status }: { status: string }) {
-  const cfg       = KYC_CFG[status] ?? KYC_CFG.PENDING;
+  const cfg = KYC_BANNER[status] ?? KYC_BANNER.PENDING;
   const isApproved = ["APPROVED", "AUTO_APPROVED"].includes(status);
   return (
-    <div className={cn(
-      "flex items-center gap-3 rounded-2xl border px-4 py-3",
-      cfg.bg
-    )}>
-      {isApproved
-        ? <BadgeCheck size={16} className="shrink-0 text-emerald-600" />
-        : <FileCheck  size={16} className={cn("shrink-0", cfg.accent)} />
-      }
+    <div className={cn("flex items-center gap-3 rounded-2xl border px-4 py-3", cfg.bg)}>
+      <FileCheck size={15} className={cn("shrink-0", cfg.text)} />
       <div className="flex-1 min-w-0">
         <p className={cn("text-xs font-semibold", cfg.text)}>
           KYC · {status.replace(/_/g, " ")}
@@ -218,12 +235,26 @@ function KycBanner({ status }: { status: string }) {
       {!isApproved && (
         <Link
           href="/dashboard/kyc"
-          className="shrink-0 rounded-lg border border-current/20 bg-white/70 px-2.5 py-1 text-[11px] font-semibold hover:bg-white transition-colors"
+          className="shrink-0 rounded-lg border border-current/20 bg-white/80 px-2.5 py-1 text-[11px] font-semibold hover:bg-white transition-colors"
         >
           {status === "REJECTED" ? "Re-submit" : "Complete"}
         </Link>
       )}
     </div>
+  );
+}
+
+// ─── Edit action chip ─────────────────────────────────────────────────────────
+
+function EditChip({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+    >
+      <Edit3 size={10} />
+      Edit
+    </Link>
   );
 }
 
@@ -234,15 +265,15 @@ function PageSkeleton() {
     <div className="min-h-screen bg-slate-50">
       <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-md">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-slate-200 animate-pulse" />
-          <div className="space-y-1.5">
-            <div className="h-4 w-20 rounded bg-slate-200 animate-pulse" />
-            <div className="h-3 w-36 rounded bg-slate-200 animate-pulse" />
-          </div>
+          <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" />
+          <div className="h-4 w-24 rounded bg-slate-200 animate-pulse" />
         </div>
       </div>
-      <div className="mx-auto max-w-3xl px-4 py-6 space-y-5">
+      <div className="mx-auto max-w-3xl px-4 py-5 space-y-4">
         <ProfileHeaderSkeleton />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-32 rounded-2xl bg-slate-100 animate-pulse" />
+        ))}
       </div>
     </div>
   );
@@ -255,7 +286,6 @@ export default function ProfilePage() {
   const { user, isLoading: authLoading } = useUser();
   const { data, isLoading, error }       = useProfile();
 
-  // Auth guard — no business logic change
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace("/login?next=/dashboard/profile");
@@ -273,9 +303,7 @@ export default function ProfilePage() {
             <ShieldOff size={22} className="text-red-500" />
           </div>
           <h2 className="text-base font-bold text-slate-900">Could not load profile</h2>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Something went wrong. Please try again.
-          </p>
+          <p className="mt-1.5 text-sm text-slate-500">Something went wrong. Please try again.</p>
           <button
             onClick={() => router.refresh()}
             className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors"
@@ -289,30 +317,30 @@ export default function ProfilePage() {
 
   const { profile } = data;
 
+  // Format phone for display
+  const displayPhone = profile.phone
+    ? `+91 ${profile.phone.slice(2, 7)} ${profile.phone.slice(7)}`
+    : null;
+
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* ── Top bar ──────────────────────────────────────────────────────── */}
+      {/* ── Top bar ── */}
       <div className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 backdrop-blur-md">
         <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link
               href="/dashboard"
               aria-label="Back to dashboard"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
             >
-              <ArrowLeft size={17} />
+              <ArrowLeft size={16} />
             </Link>
-            <div>
-              <h1 className="text-sm font-bold text-slate-900 leading-none">My Profile</h1>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Manage your personal information and account details.
-              </p>
-            </div>
+            <h1 className="text-sm font-bold text-slate-900">My Profile</h1>
           </div>
           <Link
             href="/dashboard/profile/edit"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
             <Edit3 size={12} />
             Edit Profile
@@ -320,82 +348,61 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-3xl px-4 py-5 space-y-4">
+      {/* ── Content ── */}
+      <div className="mx-auto max-w-3xl px-4 py-4 space-y-3.5">
 
-        {/* Profile hero — reusing the existing ProfileHeader component */}
+        {/* ── Profile hero card ── */}
         <ProfileHeader profile={profile} />
 
-        {/* KYC status */}
+        {/* ── KYC status ── */}
         <KycBanner status={profile.kycStatus} />
 
-        {/* ── Detail sections ───────────────────────────────────────────── */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        {/* ── Detail sections: 2-col on lg ── */}
+        <div className="grid gap-3.5 lg:grid-cols-2">
 
-          {/* Contact information */}
-          <Section title="Contact Information" icon={Mail}>
-            <Field
+          {/* Contact Information */}
+          <SectionCard
+            title="Contact Information"
+            icon={Mail}
+            action={<EditChip href="/dashboard/profile/edit" />}
+          >
+            <ContactRow
               label="Email address"
               value={profile.email}
-              missing={!profile.email}
-              badge={<VerifiedBadge verified={!!profile.email} />}
+              verified={!!profile.email}
             />
-            <Field
+            <ContactRow
               label="Phone number"
-              value={
-                profile.phone
-                  ? `+91 ${profile.phone.slice(0, 5)} ${profile.phone.slice(5)}`
-                  : null
-              }
-              missing={!profile.phone}
-              badge={<VerifiedBadge verified={!!profile.phone} />}
+              value={displayPhone}
+              verified={!!profile.phone}
             />
-          </Section>
+          </SectionCard>
 
-          {/* Personal information */}
-          <Section title="Personal Information" icon={UserCircle}>
-            <Field label="Full name"      value={profile.name} />
-            <Field
+          {/* Personal Information */}
+          <SectionCard
+            title="Personal Information"
+            icon={UserCircle}
+            action={<EditChip href="/dashboard/profile/edit" />}
+          >
+            <InfoRow label="Full name"      value={profile.name} />
+            <InfoRow
               label="Date of birth"
               value={profile.dob ? formatDate(profile.dob) : null}
-              missing={!profile.dob}
             />
-            <Field
-              label="Gender"
-              value={
-                profile.gender
-                  ? profile.gender.charAt(0) + profile.gender.slice(1).toLowerCase().replace(/_/g, " ")
-                  : null
-              }
-              missing={!profile.gender}
-            />
-            <Field
-              label="Marital status"
-              value={
-                profile.maritalStatus
-                  ? profile.maritalStatus.charAt(0) + profile.maritalStatus.slice(1).toLowerCase()
-                  : null
-              }
-              missing={!profile.maritalStatus}
-            />
-          </Section>
+            <InfoRow label="Gender"         value={humanize(profile.gender)} />
+            <InfoRow label="Marital status" value={humanize(profile.maritalStatus)} />
+          </SectionCard>
 
-          {/* Account information */}
-          <Section title="Account Information" icon={User}>
-            <Field
-              label="Member since"
-              value={formatDate(profile.createdAt)}
-            />
-            <Field
-              label="Last login"
-              value={formatDateTime(profile.lastLoginAt)}
-            />
-            <Field
+          {/* Account Information */}
+          <SectionCard title="Account Information" icon={User}>
+            <InfoRow label="Member since"    value={formatDate(profile.createdAt)} />
+            <InfoRow label="Last login"      value={formatDateTime(profile.lastLoginAt)} />
+            <InfoRow
               label="Account status"
               value={profile.isFrozen ? "Frozen" : "Active"}
               badge={
                 <span className={cn(
-                  "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border",
+                  "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold",
                   profile.isFrozen
                     ? "bg-red-50 border-red-100 text-red-700"
                     : "bg-emerald-50 border-emerald-100 text-emerald-700"
@@ -404,19 +411,23 @@ export default function ProfilePage() {
                 </span>
               }
             />
-            <Field
+            <InfoRow
               label="KYC status"
-              value={profile.kycStatus.replace(/_/g, " ")}
+              value={humanize(profile.kycStatus)}
               badge={
                 profile.kycVerified
-                  ? <VerifiedBadge verified />
+                  ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      Verified
+                    </span>
+                  )
                   : undefined
               }
             />
-          </Section>
+          </SectionCard>
 
           {/* Security */}
-          <Section title="Security" icon={Shield}>
+          <SectionCard title="Security" icon={Shield}>
             <SecurityRow
               icon={Smartphone}
               label="Last login"
@@ -424,34 +435,28 @@ export default function ProfilePage() {
               status="info"
             />
             <SecurityRow
-              icon={Lock}
-              label="Password"
-              value="Protected"
-              status="inactive"
-            />
-            <SecurityRow
               icon={Shield}
-              label="Two-factor authentication"
+              label="Two-factor auth"
               value={profile.twoFactorEnabled ? "Enabled" : "Not enabled"}
               status={profile.twoFactorEnabled ? "active" : "inactive"}
             />
-          </Section>
+          </SectionCard>
 
         </div>
 
-        {/* ── Quick actions ─────────────────────────────────────────────── */}
-        <Section title="Quick Actions" icon={CalendarDays}>
+        {/* ── Quick Actions ── */}
+        <SectionCard title="Quick Actions" icon={CalendarDays}>
           <QuickLink
             icon={Edit3}
             label="Edit Profile"
-            sub="Update your name, email, or phone"
+            sub="Update name, email, phone or personal info"
             href="/dashboard/profile/edit"
             color="slate"
           />
           <QuickLink
             icon={FileCheck}
             label="KYC Verification"
-            sub="Verify your identity to unlock all features"
+            sub="Verify identity to unlock all features"
             href="/dashboard/kyc"
             color="blue"
           />
@@ -472,20 +477,19 @@ export default function ProfilePage() {
           <QuickLink
             icon={BarChart3}
             label="My Investments"
-            sub="Track all your active and completed plans"
+            sub="Track active and completed plans"
             href="/dashboard/my-investments"
             color="violet"
           />
           <QuickLink
             icon={HelpCircle}
-            label="Help & Support"
+            label="Help &amp; Support"
             sub="Get assistance from our team"
             href="/dashboard"
             color="amber"
           />
-        </Section>
+        </SectionCard>
 
-        {/* Footer spacer */}
         <div className="pb-4" />
       </div>
     </div>
