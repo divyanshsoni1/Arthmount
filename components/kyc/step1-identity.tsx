@@ -118,6 +118,10 @@ export function Step1Identity({ defaultValues, onNext }: Step1Props) {
                   placeholder="ABCDE1234F"
                   autoComplete="off"
                   maxLength={10}
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   aria-invalid={fieldState.invalid}
                   aria-describedby="pan-hint"
                   className="font-mono tracking-widest uppercase text-base"

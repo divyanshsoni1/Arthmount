@@ -19,29 +19,36 @@ function SummaryCard({ label, value, sub, icon: Icon, gradient, loading }: CardP
   return (
     <div
       className={`
-        relative overflow-hidden rounded-2xl p-5 shadow-sm text-white
+        relative overflow-hidden rounded-2xl p-4 sm:p-5 shadow-sm text-white
         transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md
         ${gradient}
       `}
     >
+      {/* Decorative circles */}
       <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
       <div className="pointer-events-none absolute -bottom-6 -left-6 h-16 w-16 rounded-full bg-white/5" />
 
       <div className="relative">
-        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-          <Icon size={16} className="text-white" />
+        <div className="mb-2.5 sm:mb-3 flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+          <Icon size={14} className="text-white sm:hidden" />
+          <Icon size={16} className="text-white hidden sm:block" />
         </div>
 
         {loading ? (
           <div className="space-y-2">
-            <div className="h-6 w-28 animate-pulse rounded-lg bg-white/20" />
-            <div className="h-3 w-20 animate-pulse rounded bg-white/15" />
+            <div className="h-5 w-24 animate-pulse rounded-lg bg-white/20 sm:h-6 sm:w-28" />
+            <div className="h-3 w-16 animate-pulse rounded bg-white/15 sm:w-20" />
           </div>
         ) : (
           <>
-            <p className="text-xl font-extrabold tabular-nums leading-tight">{value}</p>
-            <p className="mt-0.5 text-[11px] font-medium text-white/70">{label}</p>
-            {sub && <p className="mt-0.5 text-[10px] text-white/50">{sub}</p>}
+            {/* Responsive value — smaller on very small screens */}
+            <p className="text-base font-extrabold tabular-nums leading-tight sm:text-xl truncate" title={value}>
+              {value}
+            </p>
+            <p className="mt-0.5 text-[10px] font-medium text-white/70 sm:text-[11px] leading-snug">{label}</p>
+            {sub && (
+              <p className="mt-0.5 text-[9px] text-white/50 sm:text-[10px] truncate">{sub}</p>
+            )}
           </>
         )}
       </div>
@@ -53,9 +60,9 @@ function SummaryCard({ label, value, sub, icon: Icon, gradient, loading }: CardP
 
 export function SummaryCardsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-[108px] animate-pulse rounded-2xl bg-slate-100" />
+        <div key={i} className="h-[96px] animate-pulse rounded-2xl bg-slate-100 sm:h-[108px]" />
       ))}
     </div>
   );
@@ -103,7 +110,7 @@ export function WithdrawSummaryCards({ summary, loading }: Props) {
   if (loading) return <SummaryCardsSkeleton />;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:grid-cols-4">
       {cards.map((card) => (
         <SummaryCard key={card.label} {...card} />
       ))}

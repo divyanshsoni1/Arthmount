@@ -3,22 +3,32 @@
 /**
  * Step 3 — Live Selfie Capture
  *
- * Completely rebuilt camera module with:
- * - Cross-browser support: Chrome, Firefox, Safari (iOS/macOS), Edge, Samsung Internet
- * - Cross-device support: Desktop, Android, iPhone, iPad, Tablet
- * - Front-facing camera preference with graceful fallback
- * - Multiple camera switching (if device has both front/back)
- * - Correct stream lifecycle management (no leaks)
- * - iOS Safari workarounds (autoplay, playsInline, muted required)
- * - Orientation change handling
- * - All error states: denied, unavailable, in-use, unsupported, HTTPS
- * - Image compression before storing (JPEG @ 0.88)
- * - Mirror-flip canvas draw for natural selfie preview
+ * Uses react-webcam (dynamically imported, SSR disabled) to avoid the
+ * "ref timing race" that existed in the previous raw getUserMedia
+ * implementation: the old code set videoRef.current = null because the
+ * <video> element only rendered after camState transitioned to "live",
+ * so the stream was attached before the element existed in the DOM.
+ *
+ * react-webcam owns the video element internally, so the race is gone.
+ *
+ * Features:
+ * - Front camera by default (facingMode: "user")
+ * - Mirrored live preview, non-mirrored capture (mirrored={true} in
+ *   react-webcam mirrors display but getScreenshot() returns un-mirrored)
+ * - All permission / error states: denied, unavailable, in-use, unsupported, HTTPS
+ * - Retake support
+ * - Stream cleanup on unmount / retake
+ * - JPEG @ 0.88 quality to match original behaviour
+ * - No SSR / hydration issues (ssr: false dynamic import)
  */
 
+import dynamic from "next/dynamic";
 import {
-  useCallback, useEffect, useRef, useState,
+  useCallback, useRef, useState, useEffect,
 } from "react";
+// Type-only import: used solely for typing the ref so we can call
+// .getScreenshot() and access .stream without runtime issues.
+import type WebcamType from "react-webcam";
 import {
   AlertCircle, Camera, CheckCircle2, FlipHorizontal,
   Loader2, RefreshCw, ShieldAlert, Smartphone,
@@ -26,23 +36,33 @@ import {
 
 import {
   SectionHeading, NavRow,
-  BTN_PRIMARY, BTN_OUTLINE, BTN_DANGER,
+  BTN_PRIMARY, BTN_OUTLINE,
 } from "./kyc-shared";
+
+// ─── Dynamic import — SSR disabled ───────────────────────────────────────────
+// Prevents "window is not defined" and hydration mismatches because
+// react-webcam accesses navigator/window at module-evaluation time.
+//
+// We use `as any` to side-step the TypeScript mismatch between react-webcam's
+// class defaultProps typing (screenshotFormat: string) and its prop union
+// ("image/jpeg" | "image/png" | "image/webp"). The runtime behaviour is
+// identical — react-webcam v7 is a class component that renders a <video>.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const WebcamComponent = dynamic(() => import("react-webcam") as any, { ssr: false }) as any;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CameraState =
   | "idle"
-  | "requesting"
-  | "live"
+  | "initialising"   // webcam component mounted, waiting for stream
+  | "live"           // stream active, preview visible
   | "denied"
   | "unavailable"
   | "in_use"
   | "unsupported"
   | "https_required"
-  | "overconstrained"
-  | "captured"
-  | "error";
+  | "error"
+  | "captured";
 
 interface Step3Props {
   selfie:    File | null;
@@ -51,9 +71,8 @@ interface Step3Props {
   onBack:    () => void;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Returns true if getUserMedia is available */
 function hasCameraApi(): boolean {
   return (
     typeof navigator !== "undefined" &&
@@ -62,7 +81,6 @@ function hasCameraApi(): boolean {
   );
 }
 
-/** Returns true when running in a non-secure context that would block camera */
 function isInsecureContext(): boolean {
   if (typeof window === "undefined") return false;
   const { protocol, hostname } = window.location;
@@ -74,33 +92,29 @@ function isInsecureContext(): boolean {
   );
 }
 
-/** Enumerate available video input devices */
-async function listVideoDevices(): Promise<MediaDeviceInfo[]> {
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    return devices.filter((d) => d.kind === "videoinput");
-  } catch {
-    return [];
-  }
+function classifyMediaError(err: string | DOMException): CameraState {
+  const name = typeof err === "string" ? err : err.name;
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") return "denied";
+  if (name === "NotFoundError"   || name === "DevicesNotFoundError")  return "unavailable";
+  if (name === "NotReadableError"|| name === "TrackStartError")       return "in_use";
+  return "error";
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
-  const [camState,    setCamState]    = useState<CameraState>(selfie ? "captured" : "idle");
-  const [errMsg,      setErrMsg]      = useState<string | null>(null);
-  const [preview,     setPreview]     = useState<string | null>(null);
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [deviceIndex,  setDeviceIndex]  = useState(0);   // which camera is active
-  const [facingMode,   setFacingMode]   = useState<"user" | "environment">("user");
-  const [capturing,    setCapturing]    = useState(false);
+  const [camState,  setCamState]  = useState<CameraState>(selfie ? "captured" : "idle");
+  const [errMsg,    setErrMsg]    = useState<string | null>(null);
+  const [preview,   setPreview]   = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  // Track which facing mode is active so we can toggle front ↔ back
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
-  const mountedRef = useRef(true);
+  // ref to the react-webcam instance (class component).
+  // Typed as WebcamType so we can call .getScreenshot() and access .stream.
+  const webcamRef = useRef<WebcamType>(null);
 
-  // ── Restore preview from pre-existing selfie (e.g. after Back navigation) ──
+  // ── Restore preview when user comes back from a later step ────────────────
   useEffect(() => {
     if (selfie && camState === "captured") {
       const url = URL.createObjectURL(selfie);
@@ -110,262 +124,89 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Always stop stream on unmount ──────────────────────────────────────────
+  // ── Cleanup preview URL on unmount ────────────────────────────────────────
   useEffect(() => {
-    mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
-      stopStream();
+      if (preview) URL.revokeObjectURL(preview);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Handle device orientation change — restart stream ─────────────────────
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const handleOrientation = () => {
-      if (camState === "live") {
-        // Small delay to let the browser finish reorienting
-        setTimeout(() => {
-          if (mountedRef.current && camState === "live") {
-            restartStream();
-          }
-        }, 300);
-      }
-    };
-
-    window.addEventListener("orientationchange", handleOrientation);
-    return () => window.removeEventListener("orientationchange", handleOrientation);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camState]);
-
-  // ── Stop stream utility ────────────────────────────────────────────────────
-  function stopStream() {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        try { track.stop(); } catch { /* ignore */ }
-      });
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      try {
-        videoRef.current.srcObject = null;
-      } catch { /* ignore */ }
-    }
-  }
-
-  // ── Restart stream (orientation change) ───────────────────────────────────
-  async function restartStream() {
-    stopStream();
-    await openStream(deviceIndex, facingMode);
-  }
-
-  // ── Core stream opener ─────────────────────────────────────────────────────
-  const openStream = useCallback(
-    async (devIdx: number, facing: "user" | "environment") => {
-      if (!mountedRef.current) return;
-
-      setCamState("requesting");
-      setErrMsg(null);
-
-      // 1 — API availability
-      if (!hasCameraApi()) {
-        setCamState("unsupported");
-        return;
-      }
-
-      // 2 — HTTPS check
-      if (isInsecureContext()) {
-        setCamState("https_required");
-        return;
-      }
-
-      // 3 — Enumerate devices (best effort — requires prior permission grant on some browsers)
-      let devices: MediaDeviceInfo[] = [];
-      try { devices = await listVideoDevices(); } catch { /* ignore */ }
-      if (mountedRef.current && devices.length > 0) {
-        setVideoDevices(devices);
-      }
-
-      // 4 — Build constraint cascade
-      //     We try progressively-relaxed constraints to maximise device compatibility.
-      const specificDevice = devices[devIdx]?.deviceId;
-      const constraints: MediaStreamConstraints[] = [];
-
-      if (specificDevice) {
-        // Exact device requested (multi-camera switch)
-        constraints.push({
-          video: {
-            deviceId: { exact: specificDevice },
-            width:  { ideal: 1280 },
-            height: { ideal: 720  },
-          },
-          audio: false,
-        });
-      }
-
-      // Facing mode with ideal resolution
-      constraints.push({
-        video: {
-          facingMode: { ideal: facing },
-          width:  { ideal: 1280 },
-          height: { ideal: 720  },
-        },
-        audio: false,
-      });
-
-      // Facing mode, any resolution
-      constraints.push({ video: { facingMode: facing }, audio: false });
-
-      // Any camera fallback
-      constraints.push({ video: true, audio: false });
-
-      let stream: MediaStream | null = null;
-      let lastError: Error | null    = null;
-
-      for (const constraint of constraints) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(constraint);
-          break; // success
-        } catch (e) {
-          lastError = e as Error;
-          // If permission denied, no point trying softer constraints
-          const name = (e as Error).name;
-          if (name === "NotAllowedError" || name === "PermissionDeniedError") break;
-        }
-      }
-
-      if (!mountedRef.current) {
-        // Component unmounted while awaiting
-        stream?.getTracks().forEach((t) => t.stop());
-        return;
-      }
-
-      if (!stream) {
-        const name = lastError?.name ?? "";
-        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          setCamState("denied");
-        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-          setCamState("unavailable");
-        } else if (name === "NotReadableError" || name === "TrackStartError") {
-          setCamState("in_use");
-        } else if (name === "OverconstrainedError") {
-          setCamState("overconstrained");
-          setErrMsg("The camera does not support the requested resolution. Trying basic settings…");
-        } else {
-          setErrMsg("Could not access the camera. Please check permissions and try again.");
-          setCamState("error");
-        }
-        return;
-      }
-
-      streamRef.current = stream;
-
-      // Attach to video element — iOS Safari requires autoPlay + playsInline + muted
-      const video = videoRef.current;
-      if (!video) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-
-      video.srcObject = stream;
-
-      // iOS Safari does not support await play() reliably — use event handler
-      const onReady = () => {
-        if (!mountedRef.current) return;
-        const playResult = video.play();
-        if (playResult instanceof Promise) {
-          playResult
-            .then(() => { if (mountedRef.current) setCamState("live"); })
-            .catch(() => { if (mountedRef.current) setCamState("live"); }); // still works
-        } else {
-          setCamState("live");
-        }
-      };
-
-      video.addEventListener("loadedmetadata", onReady, { once: true });
-      // Fallback: if loadedmetadata never fires (very old WebKit)
-      video.load();
-    },
-    [] // openStream has no external dependencies
-  );
-
-  // ── Start camera ───────────────────────────────────────────────────────────
+  // ── Pre-flight checks before we try to open the camera ───────────────────
   const startCamera = useCallback(() => {
-    openStream(deviceIndex, facingMode);
-  }, [openStream, deviceIndex, facingMode]);
+    setErrMsg(null);
 
-  // ── Switch between front / back cameras ───────────────────────────────────
-  const switchCamera = useCallback(async () => {
-    stopStream();
-    const newFacing = facingMode === "user" ? "environment" : "user";
-    setFacingMode(newFacing);
-
-    // If we have enumerated devices, cycle through them
-    if (videoDevices.length > 1) {
-      const next = (deviceIndex + 1) % videoDevices.length;
-      setDeviceIndex(next);
-      await openStream(next, newFacing);
-    } else {
-      await openStream(deviceIndex, newFacing);
+    if (!hasCameraApi()) {
+      setCamState("unsupported");
+      return;
     }
-  }, [facingMode, deviceIndex, videoDevices, openStream]);
+    if (isInsecureContext()) {
+      setCamState("https_required");
+      return;
+    }
 
-  // ── Capture frame from live video ─────────────────────────────────────────
+    // Mount the WebcamComponent — it will call onUserMedia / onUserMediaError
+    setCamState("initialising");
+  }, []);
+
+  // ── react-webcam callbacks ────────────────────────────────────────────────
+
+  const handleUserMedia = useCallback((_stream: MediaStream) => {
+    setCamState("live");
+    setErrMsg(null);
+  }, []);
+
+  const handleUserMediaError = useCallback((err: string | DOMException) => {
+    const state = classifyMediaError(err);
+    setCamState(state);
+    if (state === "error") {
+      const msg = typeof err === "string" ? err : err.message;
+      setErrMsg(msg || "Could not access the camera. Please check permissions and try again.");
+    }
+  }, []);
+
+  // ── Capture a frame from react-webcam ────────────────────────────────────
   const capture = useCallback(() => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || capturing) return;
+    if (!webcamRef.current || capturing) return;
 
     setCapturing(true);
 
-    // Use actual video dimensions, capped at 1280px on the longest side
-    const maxDim = 1280;
-    const vw     = video.videoWidth  || 640;
-    const vh     = video.videoHeight || 480;
-    const scale  = Math.min(1, maxDim / Math.max(vw, vh));
+    // getScreenshot() returns a data-URL (JPEG @ screenshotQuality) or null
+    const dataUrl = webcamRef.current.getScreenshot();
 
-    canvas.width  = Math.round(vw * scale);
-    canvas.height = Math.round(vh * scale);
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) { setCapturing(false); return; }
-
-    // Mirror horizontally for front-facing camera (natural selfie look)
-    if (facingMode === "user") {
-      ctx.save();
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      ctx.restore();
-    } else {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (!dataUrl) {
+      setCapturing(false);
+      setErrMsg("Failed to capture image. Please try again.");
+      return;
     }
 
-    stopStream();
+    // Stop the stream immediately so the camera indicator light turns off
+    if (webcamRef.current.stream) {
+      webcamRef.current.stream.getTracks().forEach((t) => {
+        try { t.stop(); } catch { /* ignore */ }
+      });
+    }
 
-    // Use toBlob for async, memory-efficient encoding (works on all browsers)
-    canvas.toBlob(
-      (blob) => {
-        setCapturing(false);
-        if (!blob || !mountedRef.current) {
-          setErrMsg("Failed to capture image. Please try again.");
-          setCamState("idle");
-          return;
-        }
+    // Convert the data-URL to a File so it matches the rest of the KYC upload logic
+    fetch(dataUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
         const file = new File([blob], `selfie_${Date.now()}.jpg`, { type: "image/jpeg" });
         const url  = URL.createObjectURL(file);
         setSelfie(file);
         setPreview(url);
         setCamState("captured");
-      },
-      "image/jpeg",
-      0.88
-    );
-  }, [capturing, facingMode, setSelfie]);
+      })
+      .catch(() => {
+        setErrMsg("Failed to process the captured image. Please try again.");
+        setCamState("live");
+      })
+      .finally(() => {
+        setCapturing(false);
+      });
+  }, [capturing, setSelfie]);
 
-  // ── Retake ─────────────────────────────────────────────────────────────────
+  // ── Retake: discard current selfie, go back to idle ──────────────────────
   const retake = useCallback(() => {
     if (preview) URL.revokeObjectURL(preview);
     setSelfie(null);
@@ -375,9 +216,21 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
     setErrMsg(null);
   }, [preview, setSelfie]);
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── Switch front ↔ back camera ────────────────────────────────────────────
+  const switchCamera = useCallback(() => {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  }, []);
+
+  // ── Video constraints passed to react-webcam ──────────────────────────────
+  const videoConstraints: MediaTrackConstraints = {
+    facingMode: { ideal: facingMode },
+    width:  { ideal: 1280 },
+    height: { ideal: 720  },
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
   // RENDER
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -410,40 +263,103 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
         </div>
       )}
 
-      {/* ── REQUESTING ───────────────────────────────────────────────────── */}
-      {camState === "requesting" && (
-        <div className="flex flex-col items-center gap-4 rounded-3xl bg-slate-50 px-6 py-12 mb-6 text-center">
-          <div className="relative flex h-16 w-16 items-center justify-center">
-            <Loader2 size={36} className="animate-spin text-emerald-500" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-800">Requesting Camera Access…</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Please allow camera access in the browser prompt
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ── INITIALISING — webcam component is mounted, waiting for stream ── */}
+      {(camState === "initialising" || camState === "live") && (
+        <div className="mb-6">
+          {/* Camera viewport */}
+          <div className="relative rounded-3xl overflow-hidden bg-black shadow-xl aspect-[4/3] sm:aspect-video">
 
-      {/* ── UNSUPPORTED ──────────────────────────────────────────────────── */}
-      {camState === "unsupported" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center mb-6">
-          <Smartphone size={32} className="mx-auto text-slate-400 mb-3" />
-          <p className="text-sm font-bold text-slate-800 mb-2">Camera Not Supported</p>
-          <p className="text-xs text-slate-500 mb-4 max-w-xs mx-auto">
-            Your browser does not support camera access. Please use Chrome, Safari, Firefox, or Edge on a modern device.
-          </p>
-        </div>
-      )}
+            {/*
+              WebcamComponent is always mounted here once we leave "idle".
+              react-webcam owns its own <video> element, so there is no
+              ref-timing race. The component requests the stream on mount
+              and calls onUserMedia / onUserMediaError when done.
+            */}
+            <WebcamComponent
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.88}
+              videoConstraints={videoConstraints}
+              mirrored={facingMode === "user"}
+              onUserMedia={handleUserMedia}
+              onUserMediaError={handleUserMediaError}
+              className="w-full h-full object-cover"
+              // iOS Safari requirements
+              playsInline
+              muted
+            />
 
-      {/* ── HTTPS REQUIRED ───────────────────────────────────────────────── */}
-      {camState === "https_required" && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center mb-6">
-          <ShieldAlert size={32} className="mx-auto text-amber-500 mb-3" />
-          <p className="text-sm font-bold text-slate-800 mb-2">Secure Connection Required</p>
-          <p className="text-xs text-slate-500 mb-4 max-w-xs mx-auto">
-            Camera access requires HTTPS. Please access this page over a secure (HTTPS) connection.
-          </p>
+            {/* Spinner overlay while initialising */}
+            {camState === "initialising" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 gap-3">
+                <Loader2 size={32} className="animate-spin text-white" />
+                <p className="text-xs font-semibold text-white">
+                  Requesting Camera Access…
+                </p>
+                <p className="text-[11px] text-white/70">
+                  Please allow camera access in the browser prompt
+                </p>
+              </div>
+            )}
+
+            {/* Face guide oval (visible once live) */}
+            {camState === "live" && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                >
+                  <div className="w-48 h-56 sm:w-52 sm:h-60 rounded-full border-4 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                </div>
+
+                {/* Instruction overlay */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-4 left-0 right-0 flex justify-center"
+                >
+                  <span className="rounded-full bg-black/50 px-4 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    Centre your face in the oval
+                  </span>
+                </div>
+
+                {/* Switch camera button */}
+                <button
+                  type="button"
+                  onClick={switchCamera}
+                  aria-label="Switch camera"
+                  className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors"
+                >
+                  <FlipHorizontal size={18} />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Controls — shown once live */}
+          {camState === "live" && (
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCamState("idle")}
+                className={`${BTN_OUTLINE} flex-1`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={capture}
+                disabled={capturing}
+                className={`${BTN_PRIMARY} flex-1`}
+                aria-label="Capture selfie"
+              >
+                {capturing
+                  ? <><Loader2 size={15} className="animate-spin" /> Capturing…</>
+                  : <><Camera size={15} /> Capture Selfie</>
+                }
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -494,8 +410,30 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
         </div>
       )}
 
-      {/* ── OVERCONSTRAINED / GENERIC ERROR ──────────────────────────────── */}
-      {(camState === "overconstrained" || camState === "error") && (
+      {/* ── UNSUPPORTED BROWSER ──────────────────────────────────────────── */}
+      {camState === "unsupported" && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center mb-6">
+          <Smartphone size={32} className="mx-auto text-slate-400 mb-3" />
+          <p className="text-sm font-bold text-slate-800 mb-2">Camera Not Supported</p>
+          <p className="text-xs text-slate-500 mb-4 max-w-xs mx-auto">
+            Your browser does not support camera access. Please use Chrome, Safari, Firefox, or Edge on a modern device.
+          </p>
+        </div>
+      )}
+
+      {/* ── HTTPS REQUIRED ───────────────────────────────────────────────── */}
+      {camState === "https_required" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center mb-6">
+          <ShieldAlert size={32} className="mx-auto text-amber-500 mb-3" />
+          <p className="text-sm font-bold text-slate-800 mb-2">Secure Connection Required</p>
+          <p className="text-xs text-slate-500 mb-4 max-w-xs mx-auto">
+            Camera access requires HTTPS. Please access this page over a secure connection.
+          </p>
+        </div>
+      )}
+
+      {/* ── GENERIC ERROR ─────────────────────────────────────────────────── */}
+      {camState === "error" && (
         <div className="mb-6">
           {errMsg && (
             <div className="flex items-start gap-2.5 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 mb-4">
@@ -509,78 +447,6 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
         </div>
       )}
 
-      {/* ── LIVE FEED ────────────────────────────────────────────────────── */}
-      {camState === "live" && (
-        <div className="mb-6">
-          {/* Camera viewport */}
-          <div className="relative rounded-3xl overflow-hidden bg-black shadow-xl aspect-[4/3] sm:aspect-video">
-            {/* Video element — iOS Safari requires autoPlay, playsInline, muted */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={[
-                "w-full h-full object-cover",
-                facingMode === "user" ? "scale-x-[-1]" : "",
-              ].join(" ")}
-            />
-
-            {/* Face guide oval */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex items-center justify-center"
-            >
-              <div className="w-48 h-56 sm:w-52 sm:h-60 rounded-full border-4 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-            </div>
-
-            {/* Instruction overlay at top */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute top-4 left-0 right-0 flex justify-center"
-            >
-              <span className="rounded-full bg-black/50 px-4 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
-                Centre your face in the oval
-              </span>
-            </div>
-
-            {/* Switch camera button (top-right) — only if multiple cameras */}
-            {videoDevices.length > 1 && (
-              <button
-                type="button"
-                onClick={switchCamera}
-                aria-label="Switch camera"
-                className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors"
-              >
-                <FlipHorizontal size={18} />
-              </button>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="mt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={() => { stopStream(); setCamState("idle"); }}
-              className={`${BTN_OUTLINE} flex-1`}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={capture}
-              disabled={capturing}
-              className={`${BTN_PRIMARY} flex-1`}
-            >
-              {capturing
-                ? <><Loader2 size={15} className="animate-spin" /> Capturing…</>
-                : <><Camera size={15} /> Capture Selfie</>
-              }
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── CAPTURED PREVIEW ─────────────────────────────────────────────── */}
       {camState === "captured" && preview && (
         <div className="mb-6">
@@ -590,13 +456,11 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
               alt="Your captured selfie"
               className="w-full aspect-[4/3] sm:aspect-video object-cover"
             />
-            {/* Approved badge */}
             <div className="absolute top-4 left-4 flex items-center gap-1.5 rounded-full bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-lg">
               <CheckCircle2 size={13} /> Selfie Captured
             </div>
           </div>
 
-          {/* Retake option */}
           <button
             type="button"
             onClick={retake}
@@ -606,9 +470,6 @@ export function Step3Selfie({ selfie, setSelfie, onNext, onBack }: Step3Props) {
           </button>
         </div>
       )}
-
-      {/* Hidden canvas used for frame extraction — never visible */}
-      <canvas ref={canvasRef} className="sr-only" aria-hidden="true" />
 
       {/* ── Tips ─────────────────────────────────────────────────────────── */}
       {(camState === "idle" || camState === "live") && (
