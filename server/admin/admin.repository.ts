@@ -344,3 +344,208 @@ export async function getAuditLogs(page: number, limit: number) {
   ]);
   return { logs, total, pages: Math.ceil(total / limit) };
 }
+
+// ─── Update KYC status (admin override) ──────────────────────────────────────
+
+export async function updateUserKycStatus(
+  userId:          string,
+  adminId:         string,
+  newStatus:       KycStatus,
+  rejectionReason?: string
+) {
+  return prisma.$transaction(async (tx) => {
+    // Fetch previous status for audit log
+    const prev = await tx.user.findUniqueOrThrow({
+      where:  { id: userId },
+      select: { kycStatus: true, kycDocument: { select: { id: true } } },
+    });
+
+    const isApproved = newStatus === "APPROVED" || newStatus === "AUTO_APPROVED";
+    const isRejected = newStatus === "REJECTED";
+
+    // Update the user record
+    await tx.user.update({
+      where: { id: userId },
+      data:  {
+        kycStatus:         newStatus,
+        kycVerified:       isApproved,
+        kycRejectedReason: isRejected ? (rejectionReason ?? null) : null,
+      },
+    });
+
+    // Update the KYC document record if one exists
+    if (prev.kycDocument?.id) {
+      await tx.kycDocument.update({
+        where: { id: prev.kycDocument.id },
+        data: {
+          status:          newStatus,
+          verifiedAt:      isApproved ? new Date() : null,
+          rejectedAt:      isRejected ? new Date() : null,
+          rejectionReason: isRejected ? (rejectionReason ?? null) : null,
+          reviewedById:    adminId,
+        },
+      });
+    }
+
+    // Audit log
+    await tx.adminAuditLog.create({
+      data: {
+        adminId,
+        action:       newStatus === "APPROVED" || newStatus === "AUTO_APPROVED" ? "APPROVE" : newStatus === "REJECTED" ? "REJECT" : "UPDATE",
+        resourceType: "KYC",
+        resourceId:   userId,
+        title:        `KYC Status Updated to ${newStatus}`,
+        description:  isRejected ? (rejectionReason ?? undefined) : `Previous: ${prev.kycStatus}`,
+        status:       "SUCCESS",
+      },
+    });
+
+    return { previousStatus: prev.kycStatus, newStatus };
+  });
+}
+
+// ─── Change user role ─────────────────────────────────────────────────────────
+
+export async function changeUserRole(
+  userId:   string,
+  adminId:  string,
+  newRole:  Role
+) {
+  return prisma.$transaction(async (tx) => {
+    const prev = await tx.user.findUniqueOrThrow({
+      where:  { id: userId },
+      select: { role: true, name: true },
+    });
+
+    const updated = await tx.user.update({
+      where:  { id: userId },
+      data:   { role: newRole },
+      select: { id: true, name: true, role: true },
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        adminId,
+        action:       "UPDATE",
+        resourceType: "USER",
+        resourceId:   userId,
+        title:        `User Role Changed: ${prev.role} → ${newRole}`,
+        description:  `Role updated for ${prev.name}`,
+        status:       "SUCCESS",
+      },
+    });
+
+    return { previousRole: prev.role, newRole, user: updated };
+  });
+}
+
+// ─── Reset / update user password ────────────────────────────────────────────
+
+import bcrypt from "bcrypt";
+
+export async function resetUserPassword(
+  userId:      string,
+  adminId:     string,
+  newPassword: string
+) {
+  const hash = await bcrypt.hash(newPassword, 12);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data:  {
+        passwordHash:    hash,
+        // Invalidate all existing sessions
+        sessionRevokedAt: new Date(),
+      },
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        adminId,
+        action:       "RESET_PASSWORD",
+        resourceType: "USER",
+        resourceId:   userId,
+        title:        "Admin Password Reset",
+        description:  "Password was reset by an administrator. All active sessions invalidated.",
+        status:       "SUCCESS",
+      },
+    });
+
+    return { success: true };
+  });
+}
+
+// ─── Wallet adjustment (credit / debit) ───────────────────────────────────────
+
+export type WalletAdjustmentType = "CREDIT" | "DEBIT";
+
+export async function adjustUserWallet(
+  userId:  string,
+  adminId: string,
+  type:    WalletAdjustmentType,
+  amount:  number,
+  reason:  string,
+  note?:   string
+) {
+  return prisma.$transaction(async (tx) => {
+    // Fetch current balance — lock the row
+    const user = await tx.user.findUniqueOrThrow({
+      where:  { id: userId },
+      select: { mainBalance: true, name: true },
+    });
+
+    const current = Number(user.mainBalance);
+
+    if (type === "DEBIT" && amount > current) {
+      throw new Error(`Insufficient balance. Available: ₹${current.toFixed(2)}`);
+    }
+
+    const newBalance = type === "CREDIT" ? current + amount : current - amount;
+
+    if (newBalance < 0) {
+      throw new Error("Wallet balance cannot go negative.");
+    }
+
+    // Update balance
+    const updated = await tx.user.update({
+      where:  { id: userId },
+      data:   { mainBalance: newBalance },
+      select: { id: true, mainBalance: true },
+    });
+
+    // Create ledger entry
+    await tx.ledger.create({
+      data: {
+        userId,
+        entryType:        type === "CREDIT" ? "CREDIT" : "DEBIT",
+        transactionType:  "ADJUSTMENT",
+        referenceType:    "ADMIN_ADJUSTMENT",
+        amount,
+        balanceBefore:    current,
+        balanceAfter:     newBalance,
+        description:      reason + (note ? ` — ${note}` : ""),
+      },
+    });
+
+    // Audit log
+    await tx.adminAuditLog.create({
+      data: {
+        adminId,
+        action:       "UPDATE",
+        resourceType: "USER",
+        resourceId:   userId,
+        title:        `Wallet ${type === "CREDIT" ? "Credit" : "Debit"}: ₹${amount.toFixed(2)}`,
+        description:  reason + (note ? ` | Note: ${note}` : ""),
+        status:       "SUCCESS",
+      },
+    });
+
+    return {
+      previousBalance: current,
+      newBalance:      Number(updated.mainBalance),
+      type,
+      amount,
+    };
+  });
+}

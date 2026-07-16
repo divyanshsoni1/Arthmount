@@ -407,3 +407,73 @@ export function useAdminWithdrawalAction() {
     },
   });
 }
+
+// ─── User actions ─────────────────────────────────────────────────────────────
+
+export type KycStatusValue = "PENDING" | "IN_REVIEW" | "APPROVED" | "AUTO_APPROVED" | "REJECTED";
+export type UserRoleValue  = "USER" | "AGENT" | "ADMIN" | "SUPPORT";
+export type WalletOpType   = "CREDIT" | "DEBIT";
+
+export function useUpdateUserKyc(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["admin", "users", "kyc", userId],
+    mutationFn: async (payload: { status: KycStatusValue; rejectionReason?: string }) => {
+      await apiClient.patch(`/admin/users/${userId}/kyc`, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users", "detail", userId] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      qc.invalidateQueries({ queryKey: ["admin", "kyc"] });
+      qc.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+}
+
+export function useChangeUserRole(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["admin", "users", "role", userId],
+    mutationFn: async (payload: { role: UserRoleValue }) => {
+      await apiClient.patch(`/admin/users/${userId}/role`, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users", "detail", userId] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      qc.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+}
+
+export function useResetUserPassword(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["admin", "users", "password", userId],
+    mutationFn: async (payload: { password: string; confirmPassword: string }) => {
+      await apiClient.post(`/admin/users/${userId}/password`, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users", "detail", userId] });
+    },
+  });
+}
+
+export function useAdjustWallet(userId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["admin", "users", "wallet", userId],
+    mutationFn: async (payload: {
+      type:    WalletOpType;
+      amount:  number;
+      reason:  string;
+      note?:   string;
+    }) => {
+      await apiClient.post(`/admin/users/${userId}/wallet`, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users", "detail", userId] });
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      qc.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+  });
+}

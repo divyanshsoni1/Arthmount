@@ -1,13 +1,14 @@
 "use client";
 
-import { use, useState }                                from "react";
+import { use, useState, useCallback }                    from "react";
 import Link                                              from "next/link";
 import { useAdminUserDetail, useFreezeUser, extractError } from "@/api-client/admin";
+import { UserActionsMenu }                               from "@/components/admin/users/UserActionsMenu";
 import {
   ArrowLeft, BadgeCheck, Loader2, ShieldX, User, Wallet,
-  FileCheck, Activity, Calendar, Mail, Phone, Shield,
-  Clock, ArrowDownLeft, ArrowUpRight, TrendingUp,
-  MoreHorizontal, CheckCircle2, XCircle,
+  FileCheck, Mail, Phone,
+  ArrowDownLeft, TrendingUp,
+  CheckCircle2, XCircle, Copy, Check,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,6 +62,68 @@ const INV_STATUS: Record<string, string> = {
   WITHDRAWN: "bg-amber-50 text-amber-700",
 };
 
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+interface Toast { id: number; type: "success" | "error"; message: string }
+
+function ToastList({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: number) => void }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={[
+            "flex items-center gap-3 rounded-2xl px-4 py-3 shadow-lg text-sm font-semibold pointer-events-auto max-w-sm",
+            t.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white",
+          ].join(" ")}
+        >
+          {t.type === "success"
+            ? <CheckCircle2 size={15} className="shrink-0" />
+            : <XCircle      size={15} className="shrink-0" />}
+          <span className="flex-1">{t.message}</span>
+          <button
+            type="button" onClick={() => onRemove(t.id)} aria-label="Dismiss"
+            className="ml-1 rounded-full p-0.5 hover:bg-white/20 transition-colors"
+          >
+            <XCircle size={13} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Copy button ──────────────────────────────────────────────────────────────
+
+function CopyButton({ text, onCopied, onFailed }: { text: string; onCopied: () => void; onFailed: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    if (!navigator?.clipboard) { onFailed(); return; }
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopied(true);
+        onCopied();
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => onFailed());
+  }
+
+  return (
+    <button
+      type="button" onClick={handleCopy}
+      aria-label="Copy User ID"
+      title="Copy User ID"
+      className="flex h-5 w-5 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+    >
+      {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+    </button>
+  );
+}
+
 // ─── Info row ─────────────────────────────────────────────────────────────────
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -92,6 +155,17 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [err, setErr]            = useState<string | null>(null);
   const [confirm, setConfirm]    = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [toasts, setToasts]      = useState<Toast[]>([]);
+
+  const addToast = useCallback((type: Toast["type"], message: string) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }, []);
+
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const handleFreeze = async (val: boolean) => {
     setErr(null);
@@ -210,10 +284,14 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
               <FileCheck size={14} /> Review KYC
             </Link>
           )}
-          <button type="button"
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-            <MoreHorizontal size={14} /> More Actions
-          </button>
+          <UserActionsMenu
+            userId={id}
+            currentKyc={(user as any).kycStatus ?? "PENDING"}
+            currentRole={user.role}
+            walletBalance={parseFloat(user.mainBalance)}
+            onSuccess={(msg) => addToast("success", msg)}
+            onError={(msg)   => addToast("error",   msg)}
+          />
         </div>
 
         {/* Tabs */}
@@ -241,7 +319,16 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-2xl border border-slate-100 bg-white shadow-sm p-5">
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Account Details</p>
-              <InfoRow label="User ID"       value={<span className="font-mono text-xs">{user.id.slice(0, 16)}…</span>} />
+              <InfoRow label="User ID" value={
+                <span className="flex items-center justify-end gap-1.5">
+                  <span className="font-mono text-xs text-slate-600">{user.id.slice(0, 16)}…</span>
+                  <CopyButton
+                    text={user.id}
+                    onCopied={() => addToast("success", "User ID copied")}
+                    onFailed={() => addToast("error",   "Could not access clipboard")}
+                  />
+                </span>
+              } />
               <InfoRow label="Name"          value={user.name} />
               <InfoRow label="Email"         value={user.email ?? "—"} />
               <InfoRow label="Phone"         value={(user as any).phone ?? "—"} />
@@ -421,6 +508,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </div>
       )}
+
+      {/* Toast notifications */}
+      <ToastList toasts={toasts} onRemove={removeToast} />
     </>
   );
 }
