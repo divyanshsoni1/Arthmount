@@ -214,6 +214,18 @@ export default function InvestmentDetailPage() {
     [allData]
   );
 
+  // Build simple growth sparkline for this investment (must be before any early returns)
+  const growthSeries = useMemo(() => {
+    if (!inv) return [];
+    const points = Math.max(2, inv.completedDays);
+    const dailyP = inv.principalAmount * (inv.dailyReturnRate / 100);
+    return Array.from({ length: Math.min(points, 30) }, (_, i) => {
+      const d = new Date(inv.investedAt);
+      d.setDate(d.getDate() + i);
+      return { date: d.toISOString(), value: inv.principalAmount + dailyP * (i + 1) };
+    });
+  }, [inv]);
+
   // Auth guard
   useEffect(() => {
     if (!userLoading && !user) {
@@ -288,17 +300,6 @@ export default function InvestmentDetailPage() {
   const isMatured       = inv.status === "MATURED";
   const canWithdraw     = isMatured;
   const method          = inv.paymentMethod === "RAZORPAY" ? "Online (Razorpay)" : inv.paymentMethod === "WALLET" ? "Wallet Balance" : inv.paymentMethod ?? "—";
-
-  // Build simple growth sparkline for this investment
-  const growthSeries = useMemo(() => {
-    const points = Math.max(2, inv.completedDays);
-    const dailyP = inv.principalAmount * (inv.dailyReturnRate / 100);
-    return Array.from({ length: Math.min(points, 30) }, (_, i) => {
-      const d = new Date(inv.investedAt);
-      d.setDate(d.getDate() + i);
-      return { date: d.toISOString(), value: inv.principalAmount + dailyP * (i + 1) };
-    });
-  }, [inv]);
 
   return (
     <div className="min-h-screen bg-slate-50">
