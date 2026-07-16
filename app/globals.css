@@ -135,26 +135,62 @@
   font-optical-sizing: auto;
 }
 
-/* Ticker / marquee animation */
-@keyframes ticker {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
+/* ─── Marquee / infinite ticker ────────────────────────────────────────────── */
+
+/*
+ * Strategy: a single track element holds two identical copies of the items
+ * side-by-side (total width = 2× one set). We translate from 0 to -50% so
+ * the second copy lands exactly where the first started — a perfectly seamless
+ * loop with zero visible jump.
+ *
+ * GPU-friendly: uses `transform` only (compositor thread).
+ * Pause-on-hover: .marquee-outer:hover .marquee-track pauses via CSS.
+ * Reduced-motion: animation is disabled via the media query below.
+ */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
-.ticker-track {
-  animation: ticker 30s linear infinite;
-  width: max-content;
+.marquee-outer {
+  overflow: hidden;
+  /* Mask-based fade edges for a premium soft-edge look */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
 }
 
-.ticker-track:hover {
+.marquee-track {
+  display: flex;
+  width: max-content;   /* shrink-wrap both copies */
+  will-change: transform;
+  animation: marquee-scroll 32s linear infinite;
+}
+
+/* Pause on hover (desktop) */
+.marquee-outer:hover .marquee-track {
   animation-play-state: paused;
 }
 
-/* FAQ details chevron */
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* ─── FAQ details chevron ───────────────────────────────────────────────────── */
 details summary::-webkit-details-marker {
   display: none;
 }
