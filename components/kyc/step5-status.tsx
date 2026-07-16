@@ -17,11 +17,12 @@ import Link from "next/link";
 import {
   BadgeCheck, Calendar, CheckCircle2,
   Clock, FileText, Loader2, RefreshCw,
-  ShieldX, XCircle, ZoomIn,
+  ShieldX, XCircle, AlertCircle,
 } from "lucide-react";
 
 import type { KycRecord } from "@/api-client/kyc";
-import { BTN_OUTLINE, BTN_PRIMARY, BTN_DANGER } from "./kyc-shared";
+import { useKycSignedImages } from "@/api-client/kyc";
+import { BTN_OUTLINE, BTN_PRIMARY } from "./kyc-shared";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,37 +37,126 @@ function fmtDate(iso: string | null | undefined): string {
   });
 }
 
-// ─── Document thumbnail strip (from server URLs) ──────────────────────────────
+// ─── Document thumbnail strip — uses server-signed URLs ──────────────────────
+//
+// Raw MinIO URLs are internal and may not be reachable from the browser.
+// We fetch a fresh set of pre-signed URLs from /api/kyc/signed-images and
+// display those instead. Handles loading, error, and missing-image states.
+
+interface DocThumbnailProps {
+  label: string;
+  url:   string | null | undefined;
+}
+
+function DocThumbnail({ label, url }: DocThumbnailProps) {
+  const [imgError, setImgError] = useState(false);
+  const [loaded,   setLoaded]   = useState(false);
+
+  // Reset when url changes (e.g. signed URL refreshed)
+  useEffect(() => {
+    setImgError(false);
+    setLoaded(false);
+  }, [url]);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+      <div className="relative w-full" style={{ aspectRatio: "4/3" }}>
+        {/* No URL */}
+        {!url && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+            <FileText size={18} className="text-slate-300" />
+            <p className="text-[10px] text-slate-400">Not uploaded</p>
+          </div>
+        )}
+
+        {/* Image with skeleton loader */}
+        {url && !imgError && (
+          <>
+            {!loaded && (
+              <div className="absolute inset-0 animate-pulse bg-slate-200 rounded-t-xl" />
+            )}
+            <img
+              src={url}
+              alt={label}
+              width={160}
+              height={120}
+              loading="lazy"
+              onLoad={() => setLoaded(true)}
+              onError={() => { setLoaded(true); setImgError(true); }}
+              className={[
+                "absolute inset-0 w-full h-full object-cover transition-opacity duration-200",
+                loaded ? "opacity-100" : "opacity-0",
+              ].join(" ")}
+            />
+          </>
+        )}
+
+        {/* Load error */}
+        {url && imgError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+            <AlertCircle size={18} className="text-red-300" />
+            <p className="text-[10px] text-red-400">Failed to load</p>
+          </div>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-500 text-center py-1 px-1 truncate">{label}</p>
+    </div>
+  );
+}
 
 function DocStrip({ kyc }: { kyc: KycRecord }) {
-  const docs = [
-    { label: "Aadhaar Front", url: kyc.aadhaarFrontUrl },
-    { label: "Aadhaar Back",  url: kyc.aadhaarBackUrl  },
-    { label: "PAN Front",     url: kyc.panFrontUrl     },
-    { label: "PAN Back",      url: kyc.panBackUrl      },
-    { label: "Selfie",        url: kyc.selfieUrl       },
-  ].filter((d) => !!d.url);
+  // Only fetch signed images when the KYC record has at least one document URL
+  const hasAnyDoc =
+    !!(kyc.aadhaarFrontUrl || kyc.aadhaarBackUrl ||
+       kyc.panFrontUrl     || kyc.panBackUrl     ||
+       kyc.selfieUrl);
 
-  if (docs.length === 0) return null;
+  const { data: images, isLoading, isError } = useKycSignedImages(hasAnyDoc);
+
+  if (!hasAnyDoc) return null;
+
+  const docs: { label: string; url: string | null | undefined }[] = [
+    { label: "Aadhaar Front", url: images?.aadhaarFrontUrl },
+    { label: "Aadhaar Back",  url: images?.aadhaarBackUrl  },
+    { label: "PAN Front",     url: images?.panFrontUrl     },
+    { label: "PAN Back",      url: images?.panBackUrl      },
+    { label: "Selfie",        url: images?.selfieUrl       },
+  ];
 
   return (
     <div className="w-full mb-5">
       <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3 text-left">
         Submitted Documents
       </p>
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-        {docs.map(({ label, url }) => (
-          <div key={label} className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
-            <img
-              src={url!}
-              alt={label}
-              className="w-full h-20 object-cover"
-              loading="lazy"
-            />
-            <p className="text-[10px] text-slate-500 text-center py-1 px-1 truncate">{label}</p>
-          </div>
-        ))}
-      </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="rounded-xl overflow-hidden border border-slate-100">
+              <div className="animate-pulse bg-slate-200" style={{ aspectRatio: "4/3" }} />
+              <div className="h-5 animate-pulse bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error state */}
+      {isError && !isLoading && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-xs text-red-600">
+          <AlertCircle size={13} className="shrink-0" />
+          Could not load document previews. Please refresh.
+        </div>
+      )}
+
+      {/* Document grid */}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {docs.map(({ label, url }) => (
+            <DocThumbnail key={label} label={label} url={url} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

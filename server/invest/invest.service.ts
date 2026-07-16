@@ -32,6 +32,28 @@ import {
 /** Minimum investable amount in rupees */
 const MIN_INVEST_AMOUNT = 10;
 
+// ─── KYC guard ────────────────────────────────────────────────────────────────
+// Called at the top of every mutating invest handler.
+// Only KYC status APPROVED / AUTO_APPROVED allows investing.
+
+async function requireVerifiedKyc(userId: string): Promise<void> {
+  const kyc = await prisma.kycDocument.findUnique({
+    where:  { userId },
+    select: { status: true },
+  });
+
+  const approved =
+    kyc?.status === "APPROVED" || kyc?.status === "AUTO_APPROVED";
+
+  if (!approved) {
+    throw new AuthError(
+      "Complete KYC verification before investing.",
+      "KYC_REQUIRED",
+      403
+    );
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateReceiptId(): string {
@@ -96,6 +118,9 @@ export async function investFromWallet(
   input: WalletInvestInput
 ): Promise<UserInvestmentRow> {
   const { userId, packageId, amount } = input;
+
+  // ── KYC guard — must be verified before any investment ──
+  await requireVerifiedKyc(userId);
 
   // ── Validate amount ──
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -228,6 +253,9 @@ export async function createInvestOrder(
 ): Promise<CreateInvestOrderResult> {
   const { userId, packageId, amount } = input;
 
+  // ── KYC guard ──
+  await requireVerifiedKyc(userId);
+
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new AuthError("Investment amount must be a positive number.", "INVALID_AMOUNT", 422);
   }
@@ -306,6 +334,9 @@ export async function verifyAndInvest(
     userId, packageId, amount,
     razorpayOrderId, razorpayPaymentId, razorpaySignature,
   } = input;
+
+  // ── KYC guard — check before touching the payment ──
+  await requireVerifiedKyc(userId);
 
   // Verify Razorpay signature — MUST happen before any DB write
   const valid = verifyRazorpaySignature(

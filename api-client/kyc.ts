@@ -206,3 +206,34 @@ export function extractKycError(error: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+
+// ─── useKycSignedImages ───────────────────────────────────────────────────────
+// Fetches temporary pre-signed URLs for the current user's KYC documents.
+// Used by step5-status to display document thumbnails without exposing the
+// raw internal storage URL, which may not be publicly reachable.
+
+export interface KycSignedImages {
+  aadhaarFrontUrl: string | null;
+  aadhaarBackUrl:  string | null;
+  panFrontUrl:     string | null;
+  panBackUrl:      string | null;
+  selfieUrl:       string | null;
+}
+
+export const KYC_SIGNED_IMAGES_KEY = ["kyc", "signed-images"] as const;
+
+export function useKycSignedImages(enabled = true) {
+  return useQuery<KycSignedImages | null>({
+    queryKey: KYC_SIGNED_IMAGES_KEY,
+    queryFn:  async () => {
+      const res = await apiClient.get<ApiSuccess<{ images: KycSignedImages | null }>>(
+        "/kyc/signed-images"
+      );
+      return res.data.data.images;
+    },
+    enabled,
+    // Signed URLs expire in 60 min; refetch at 55 min to stay fresh
+    staleTime: 55 * 60 * 1000,
+    retry:     false,
+  });
+}

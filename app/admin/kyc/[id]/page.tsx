@@ -398,10 +398,11 @@ export default function KycDetailPage({ params }: { params: Promise<{ id: string
                 <p className="text-sm font-bold text-slate-800">Uploaded Documents</p>
                 <span className="text-xs text-slate-400">URLs are pre-signed • 60 min expiry</span>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <DocCard label="Aadhaar Front" url={kyc.aadhaarFrontUrl} docType="aadhaar" />
                 <DocCard label="Aadhaar Back"  url={kyc.aadhaarBackUrl}  docType="aadhaar_back" />
                 <DocCard label="PAN Front"     url={kyc.panFrontUrl}     docType="pan" />
+                <DocCard label="PAN Back"      url={kyc.panBackUrl}      docType="pan_back" />
                 <DocCard label="Live Selfie"   url={kyc.selfieUrl}       docType="selfie" />
               </div>
             </div>

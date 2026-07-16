@@ -93,46 +93,102 @@ function DocThumb({
   file:   File | null;
   onZoom: (src: string, label: string) => void;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url,      setUrl]      = useState<string | null>(null);
+  const [loading,  setLoading]  = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
-    if (!file) return;
+    if (!file) {
+      setUrl(null);
+      setLoading(false);
+      setImgError(false);
+      return;
+    }
+    // Reset error state when a new file arrives
+    setImgError(false);
+    setLoading(true);
     const u = URL.createObjectURL(file);
     setUrl(u);
-    return () => URL.revokeObjectURL(u);
+    return () => {
+      URL.revokeObjectURL(u);
+    };
   }, [file]);
 
-  if (!url) {
+  // ── No file ──────────────────────────────────────────────────────────────
+  if (!file || !url) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <p className="text-xs font-semibold text-slate-500">{label}</p>
-        <div className="flex h-28 items-center justify-center rounded-xl bg-slate-100 border border-slate-200">
+        <div
+          // Fixed aspect ratio so the container never collapses to zero-height
+          // on mobile (WebKit reports zero intrinsic size before paint).
+          style={{ aspectRatio: "4/3" }}
+          className="flex items-center justify-center rounded-xl bg-slate-100 border border-slate-200 w-full"
+        >
           <FileText size={22} className="text-slate-400" />
         </div>
       </div>
     );
   }
 
+  // ── Load error ────────────────────────────────────────────────────────────
+  if (imgError) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <div
+          style={{ aspectRatio: "4/3" }}
+          className="flex flex-col items-center justify-center gap-1.5 rounded-xl bg-red-50 border border-red-100 w-full"
+        >
+          <AlertCircle size={18} className="text-red-400" />
+          <p className="text-[11px] text-red-500 font-medium">Preview failed</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Image ready ───────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1.5">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
       <button
         type="button"
         onClick={() => onZoom(url, label)}
         aria-label={`Preview ${label} fullscreen`}
-        className="relative group overflow-hidden rounded-xl border-2 border-slate-100 hover:border-emerald-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="relative group overflow-hidden rounded-xl border-2 border-slate-100 hover:border-emerald-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 w-full"
+        style={{ aspectRatio: "4/3" }}
       >
+        {/* Skeleton shown while the blob URL is being decoded by the browser */}
+        {loading && (
+          <div className="absolute inset-0 animate-pulse bg-slate-200 rounded-xl" />
+        )}
+        {/*
+          width/height are set explicitly so mobile WebKit (Safari iOS,
+          Android WebView) never collapses the element to 0×0 before the
+          image fires onLoad. The combination of w-full + aspect-ratio on
+          the parent + width/height on the img itself is the cross-browser
+          safe pattern.
+        */}
         <img
           src={url}
           alt={label}
-          className="w-full h-28 object-cover"
+          width={400}
+          height={300}
+          onLoad={() => setLoading(false)}
+          onError={() => { setLoading(false); setImgError(true); }}
+          className={[
+            "absolute inset-0 w-full h-full object-cover transition-opacity duration-200",
+            loading ? "opacity-0" : "opacity-100",
+          ].join(" ")}
         />
-        {/* Hover overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
-          <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-800">
-            <ZoomIn size={11} /> View
-          </span>
-        </div>
+        {/* Hover / tap overlay */}
+        {!loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+            <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-slate-800">
+              <ZoomIn size={11} /> View
+            </span>
+          </div>
+        )}
       </button>
     </div>
   );
@@ -223,8 +279,9 @@ export function Step4Review({
   const [selfieUrl,  setSelfieUrl]  = useState<string | null>(null);
   const submitted = useRef(false);
 
+  // Selfie object URL — kept in sync with the File prop
   useEffect(() => {
-    if (!selfie) return;
+    if (!selfie) { setSelfieUrl(null); return; }
     const u = URL.createObjectURL(selfie);
     setSelfieUrl(u);
     return () => URL.revokeObjectURL(u);
@@ -307,7 +364,9 @@ export function Step4Review({
             <img
               src={selfieUrl}
               alt="Your selfie"
-              className="w-36 h-36 sm:w-44 sm:h-44 object-cover rounded-2xl border-4 border-emerald-200 mx-auto"
+              width={176}
+              height={176}
+              className="w-36 h-36 sm:w-44 sm:h-44 object-cover rounded-2xl border-4 border-emerald-200 mx-auto block"
             />
             <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 group-hover:bg-black/25 transition-colors">
               <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-800">

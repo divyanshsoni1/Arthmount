@@ -142,6 +142,56 @@ export async function handleSubmitKyc(req: NextRequest): Promise<NextResponse> {
   }
 }
 
+// ─── GET /api/kyc/signed-images ───────────────────────────────────────────────
+// Returns temporary pre-signed URLs for the authenticated user's KYC documents.
+// Used by the status page (step5) so document thumbnails load correctly even
+// when the bucket is private (raw internal MinIO URLs are not publicly reachable).
+
+import { getSignedUrl, extractKeyFromUrl } from "@/lib/storage/minio";
+
+const SIGNED_URL_TTL = 3600; // 60 minutes — matches admin signed-URL expiry
+
+export async function handleGetSignedImages(req: NextRequest): Promise<NextResponse> {
+  try {
+    const userId = await requireAuth(req);
+    const record = await getKycStatus(userId);
+
+    if (!record) {
+      return successResponse({ images: null });
+    }
+
+    const fields = [
+      "aadhaarFrontUrl",
+      "aadhaarBackUrl",
+      "panFrontUrl",
+      "panBackUrl",
+      "selfieUrl",
+    ] as const;
+
+    // Sign all present URLs in parallel; absent URLs become null
+    const signedEntries = await Promise.all(
+      fields.map(async (field) => {
+        const rawUrl = record[field as keyof typeof record] as string | null;
+        if (!rawUrl) return [field, null] as const;
+        const key = extractKeyFromUrl(rawUrl);
+        if (!key) return [field, null] as const;
+        try {
+          const signed = await getSignedUrl(key, SIGNED_URL_TTL);
+          return [field, signed] as const;
+        } catch {
+          // Never expose raw internal URL on signing failure
+          return [field, null] as const;
+        }
+      })
+    );
+
+    const images = Object.fromEntries(signedEntries) as Record<typeof fields[number], string | null>;
+    return successResponse({ images });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
 // ─── POST /api/kyc/submit-full ────────────────────────────────────────────────
 // Receives all 6 files + identity as multipart/form-data.
 

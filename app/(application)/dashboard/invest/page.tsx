@@ -15,6 +15,7 @@ import {
   type ActivePackage,
   type InvestmentRecord,
 } from "@/api-client/invest";
+import { useKycStatus }        from "@/api-client/kyc";
 import { useQueryClient }      from "@tanstack/react-query";
 import { ACTIVE_PACKAGES_KEY } from "@/api-client/invest";
 
@@ -22,6 +23,7 @@ import { PackageCard, PackageCardSkeleton } from "@/components/invest/PackageCar
 import { PackageDetailModal }      from "@/components/invest/PackageDetailModal";
 import { InvestmentFlowModal }     from "@/components/invest/InvestmentFlowModal";
 import { InvestmentHistoryTable }  from "@/components/invest/InvestmentHistoryTable";
+import { KycRequired }             from "@/components/invest/KycRequired";
 
 // ─── Filter / sort types ──────────────────────────────────────────────────────
 
@@ -145,6 +147,7 @@ export default function InvestPage() {
   const router = useRouter();
   const { user, isLoading: userLoading }                                     = useUser();
   const { data: packages, isLoading: packagesLoading, refetch, isRefetching } = useActivePackages();
+  const { data: kyc, isLoading: kycLoading }                                 = useKycStatus();
   const qc = useQueryClient();
 
   type ModalState =
@@ -181,10 +184,17 @@ export default function InvestPage() {
     }
   }, [user, userLoading, router]);
 
+  // Derived here (not after early returns) so useCallback deps are satisfied
+  const kycApproved =
+    kyc?.status === "APPROVED" || kyc?.status === "AUTO_APPROVED";
+
   const filteredPackages = filterPackages(packages ?? [], filters);
 
   const openDetail = useCallback((pkg: ActivePackage) => setModal({ kind: "detail", pkg }), []);
-  const openInvest = useCallback((pkg: ActivePackage) => setModal({ kind: "invest", pkg }), []);
+  const openInvest = useCallback((pkg: ActivePackage) => {
+    if (!kycApproved) return; // belt-and-suspenders — gate is shown in the grid
+    setModal({ kind: "invest", pkg });
+  }, [kycApproved]);
   const closeModal = useCallback(() => setModal({ kind: "none" }), []);
 
   const handleInvestSuccess = useCallback((investment: InvestmentRecord) => {
@@ -199,7 +209,7 @@ export default function InvestPage() {
 
   // ── Loading / auth guard ─────────────────────────────────────────────────
 
-  if (userLoading) {
+  if (userLoading || kycLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -477,7 +487,12 @@ export default function InvestPage() {
                   : "flex flex-col gap-3"
               }
             >
-              {packagesLoading
+              {/* ── KYC gate — shown instead of the package grid ── */}
+              {!kycApproved ? (
+                <div className="col-span-full">
+                  <KycRequired kycStatus={kyc?.status} />
+                </div>
+              ) : packagesLoading
                 ? [...Array(6)].map((_, i) => <PackageCardSkeleton key={i} />)
                 : filteredPackages.length === 0
                   ? <EmptyPackages hasFilters={hasFilters} onClear={clearFilters} />
