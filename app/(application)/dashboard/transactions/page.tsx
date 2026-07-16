@@ -10,12 +10,10 @@ import { useUser }             from "@/api-client/user";
 import {
   type TxnFilters,
   type TransactionRecord,
-  TXN_SUMMARY_KEY,
   txnListKey,
 } from "@/api-client/transactions";
 import { isAdminRole, getDashboardRoute } from "@/lib/routing";
 
-import { SummaryCards }               from "@/components/transactions/SummaryCards";
 import { TransactionFilters }         from "@/components/transactions/TransactionFilters";
 import { TransactionList }            from "@/components/transactions/TransactionList";
 import { TransactionDetailDrawer }    from "@/components/transactions/TransactionDetailDrawer";
@@ -86,10 +84,7 @@ export default function TransactionsPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: TXN_SUMMARY_KEY }),
-      qc.invalidateQueries({ queryKey: txnListKey(filters) }),
-    ]);
+    await qc.invalidateQueries({ queryKey: txnListKey(filters) });
     setRefreshing(false);
   };
 
@@ -168,9 +163,6 @@ export default function TransactionsPage() {
 
         {/* ── Page content ─────────────────────────────────────────────────── */}
         <div className="mx-auto max-w-5xl px-4 py-6 space-y-5">
-
-          {/* KPI summary cards */}
-          <SummaryCards />
 
           {/* Filters */}
           <TransactionFilters

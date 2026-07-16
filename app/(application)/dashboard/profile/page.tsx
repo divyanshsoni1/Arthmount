@@ -11,11 +11,9 @@ import {
   CalendarDays,
   Edit3,
   FileCheck,
-  Heart,
   HelpCircle,
   Lock,
   Mail,
-  Phone,
   Receipt,
   Shield,
   ShieldOff,
@@ -27,9 +25,8 @@ import {
 
 import { useUser }    from "@/api-client/user";
 import { useProfile } from "@/api-client/profile";
-import { formatDate, formatDateTime, formatINR } from "@/api-client/profile";
-import ProfileHeader,     { ProfileHeaderSkeleton }     from "@/components/profile/ProfileHeader";
-import ProfileStatsCards, { ProfileStatsCardsSkeleton } from "@/components/profile/ProfileStatsCards";
+import { formatDate, formatDateTime } from "@/api-client/profile";
+import ProfileHeader, { ProfileHeaderSkeleton } from "@/components/profile/ProfileHeader";
 import { cn } from "@/lib/utils";
 
 // ─── Divider ──────────────────────────────────────────────────────────────────
@@ -246,7 +243,6 @@ function PageSkeleton() {
       </div>
       <div className="mx-auto max-w-3xl px-4 py-6 space-y-5">
         <ProfileHeaderSkeleton />
-        <ProfileStatsCardsSkeleton />
       </div>
     </div>
   );
@@ -291,7 +287,7 @@ export default function ProfilePage() {
     );
   }
 
-  const { profile, stats } = data;
+  const { profile } = data;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -332,9 +328,6 @@ export default function ProfilePage() {
 
         {/* KYC status */}
         <KycBanner status={profile.kycStatus} />
-
-        {/* Financial stats — reusing existing ProfileStatsCards */}
-        <ProfileStatsCards profile={profile} stats={stats} />
 
         {/* ── Detail sections ───────────────────────────────────────────── */}
         <div className="grid gap-4 lg:grid-cols-2">

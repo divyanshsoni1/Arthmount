@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, History, Search, SlidersHorizontal,
-  TrendingUp, Sparkles, X, Filter, ChevronDown,
+  TrendingUp, Sparkles, X, ChevronDown,
   LayoutGrid, List, ArrowLeft,
 } from "lucide-react";
 
@@ -18,7 +18,6 @@ import {
 import { useQueryClient }      from "@tanstack/react-query";
 import { ACTIVE_PACKAGES_KEY } from "@/api-client/invest";
 
-import { InvestSummaryCards }      from "@/components/invest/InvestSummaryCards";
 import { PackageCard, PackageCardSkeleton } from "@/components/invest/PackageCard";
 import { PackageDetailModal }      from "@/components/invest/PackageDetailModal";
 import { InvestmentFlowModal }     from "@/components/invest/InvestmentFlowModal";
@@ -30,16 +29,16 @@ type SortKey = "popular" | "roi_high" | "roi_low" | "tenure_short" | "tenure_lon
 type ViewMode = "grid" | "list";
 
 interface FilterState {
-  search:   string;
-  sort:     SortKey;
-  minROI:   number | null;
+  search:    string;
+  sort:      SortKey;
+  minROI:    number | null;
   maxTenure: number | null;
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "popular",      label: "Most Popular"   },
-  { key: "roi_high",     label: "Highest ROI"    },
-  { key: "roi_low",      label: "Lowest ROI"     },
+  { key: "popular",      label: "Most Popular"    },
+  { key: "roi_high",     label: "Highest ROI"     },
+  { key: "roi_low",      label: "Lowest ROI"      },
   { key: "tenure_short", label: "Shortest Tenure" },
   { key: "tenure_long",  label: "Longest Tenure"  },
 ];
@@ -121,7 +120,7 @@ function SuccessToast({ message, onClose }: { message: string; onClose: () => vo
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3.5 shadow-2xl text-white animate-in slide-in-from-bottom-4">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3.5 shadow-2xl text-white">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500">
         <Sparkles size={13} />
       </div>
@@ -141,19 +140,17 @@ export default function InvestPage() {
   const { data: packages, isLoading: packagesLoading, refetch, isRefetching } = useActivePackages();
   const qc = useQueryClient();
 
-  // ── Modal state ──────────────────────────────────────────────────────────────
   type ModalState =
     | { kind: "none" }
-    | { kind: "detail";  pkg: ActivePackage }
-    | { kind: "invest";  pkg: ActivePackage };
+    | { kind: "detail"; pkg: ActivePackage }
+    | { kind: "invest"; pkg: ActivePackage };
 
-  const [modal,   setModal]   = useState<ModalState>({ kind: "none" });
-  const [toast,   setToast]   = useState<string>("");
-  const [view,    setView]    = useState<ViewMode>("grid");
+  const [modal,       setModal]       = useState<ModalState>({ kind: "none" });
+  const [toast,       setToast]       = useState<string>("");
+  const [view,        setView]        = useState<ViewMode>("grid");
   const [showHistory, setShowHistory] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // ── Filters ──────────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterState>({
     search:    "",
     sort:      "popular",
@@ -171,17 +168,14 @@ export default function InvestPage() {
     setFilters({ search: "", sort: "popular", minROI: null, maxTenure: null });
   }, []);
 
-  // ── Auth guard ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!userLoading && !user) {
       router.replace("/login?next=/dashboard/invest");
     }
   }, [user, userLoading, router]);
 
-  // ── Filtered packages ────────────────────────────────────────────────────────
   const filteredPackages = filterPackages(packages ?? [], filters);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
   const openDetail = useCallback((pkg: ActivePackage) => {
     setModal({ kind: "detail", pkg });
   }, []);
@@ -197,11 +191,9 @@ export default function InvestPage() {
   const handleInvestSuccess = useCallback((investment: InvestmentRecord) => {
     setModal({ kind: "none" });
     setToast(`Investment in ${investment.packageName} confirmed! 🎉`);
-    // Packages might have updated investor counts
     qc.invalidateQueries({ queryKey: ACTIVE_PACKAGES_KEY });
   }, [qc]);
 
-  // Switch from detail modal to invest modal
   const handleDetailToInvest = useCallback((pkg: ActivePackage) => {
     setModal({ kind: "invest", pkg });
   }, []);
@@ -225,7 +217,6 @@ export default function InvestPage() {
         {/* ── Sticky top bar ───────────────────────────────────────────────── */}
         <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-            {/* Left: back + title */}
             <div className="flex items-center gap-3 min-w-0">
               <Link
                 href="/dashboard"
@@ -242,7 +233,6 @@ export default function InvestPage() {
               </div>
             </div>
 
-            {/* Right: actions */}
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
@@ -275,9 +265,9 @@ export default function InvestPage() {
 
           {/* Hero banner */}
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f172a] to-slate-700 p-6 text-white shadow-lg">
-            <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-emerald-500/10 pointer-events-none" />
-            <div className="absolute -left-6  bottom-0  h-28 w-28 rounded-full bg-white/5   pointer-events-none" />
-            <div className="absolute  right-20 bottom-4 h-20 w-20 rounded-full bg-blue-500/10 pointer-events-none" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-emerald-500/10" />
+            <div className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-white/5" />
+            <div className="pointer-events-none absolute right-20 bottom-4 h-20 w-20 rounded-full bg-blue-500/10" />
             <div className="relative">
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20">
@@ -296,9 +286,9 @@ export default function InvestPage() {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 {[
-                  { label: "Daily Returns",  value: "Credited weekly"  },
-                  { label: "Capital Safe",   value: "100% backed"      },
-                  { label: "Transparent",    value: "No hidden fees"   },
+                  { label: "Daily Returns", value: "Credited weekly" },
+                  { label: "Capital Safe",  value: "100% backed"     },
+                  { label: "Transparent",   value: "No hidden fees"  },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5">
                     <Sparkles size={10} className="text-emerald-400" />
@@ -309,9 +299,6 @@ export default function InvestPage() {
               </div>
             </div>
           </div>
-
-          {/* Summary cards */}
-          <InvestSummaryCards />
 
           {/* Investment history (collapsible) */}
           {showHistory && (
@@ -332,7 +319,6 @@ export default function InvestPage() {
 
           {/* ── Available packages section ──────────────────────────────── */}
           <div>
-            {/* Section header */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-base font-extrabold text-slate-900">Available Plans</h2>
@@ -344,7 +330,6 @@ export default function InvestPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* View toggle */}
                 <div className="flex rounded-xl border border-slate-200 bg-white overflow-hidden">
                   <button
                     type="button"
@@ -368,7 +353,6 @@ export default function InvestPage() {
                   </button>
                 </div>
 
-                {/* Filter toggle */}
                 <button
                   type="button"
                   onClick={() => setShowFilters((v) => !v)}
@@ -393,7 +377,6 @@ export default function InvestPage() {
             {showFilters && (
               <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-sm">
                 <div className="grid sm:grid-cols-3 gap-3">
-                  {/* Search */}
                   <div className="relative sm:col-span-1">
                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -405,7 +388,6 @@ export default function InvestPage() {
                     />
                   </div>
 
-                  {/* Sort */}
                   <div className="relative">
                     <select
                       value={filters.sort}
@@ -419,7 +401,6 @@ export default function InvestPage() {
                     <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
 
-                  {/* Max tenure */}
                   <div className="relative">
                     <select
                       value={filters.maxTenure ?? ""}
@@ -482,30 +463,9 @@ export default function InvestPage() {
           {/* Bottom tips strip */}
           <div className="grid sm:grid-cols-3 gap-3 pb-4">
             {[
-              {
-                emoji: "🔒",
-                title: "Capital Lock-in",
-                desc:  "Your investment is locked for the full tenure. No early withdrawal is permitted.",
-                cls:   "border-amber-100 bg-amber-50",
-                title_cls: "text-amber-800",
-                desc_cls:  "text-amber-600",
-              },
-              {
-                emoji: "📈",
-                title: "Weekly Profits",
-                desc:  "Profits are accumulated daily and credited to your wallet every week.",
-                cls:   "border-emerald-100 bg-emerald-50",
-                title_cls: "text-emerald-800",
-                desc_cls:  "text-emerald-600",
-              },
-              {
-                emoji: "🛡️",
-                title: "Safe & Secure",
-                desc:  "All transactions are encrypted and processed via verified payment gateways.",
-                cls:   "border-blue-100 bg-blue-50",
-                title_cls: "text-blue-800",
-                desc_cls:  "text-blue-600",
-              },
+              { emoji: "🔒", title: "Capital Lock-in", desc: "Your investment is locked for the full tenure. No early withdrawal is permitted.", cls: "border-amber-100 bg-amber-50", title_cls: "text-amber-800", desc_cls: "text-amber-600" },
+              { emoji: "📈", title: "Weekly Profits",  desc: "Profits are accumulated daily and credited to your wallet every week.",           cls: "border-emerald-100 bg-emerald-50", title_cls: "text-emerald-800", desc_cls: "text-emerald-600" },
+              { emoji: "🛡️", title: "Safe & Secure",  desc: "All transactions are encrypted and processed via verified payment gateways.",     cls: "border-blue-100 bg-blue-50",    title_cls: "text-blue-800",    desc_cls: "text-blue-600" },
             ].map(({ emoji, title, desc, cls, title_cls, desc_cls }) => (
               <div key={title} className={`rounded-2xl border px-4 py-4 flex items-start gap-3 ${cls}`}>
                 <span className="text-xl shrink-0 mt-0.5">{emoji}</span>
@@ -520,7 +480,6 @@ export default function InvestPage() {
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
-
       {modal.kind === "detail" && (
         <PackageDetailModal
           pkg={modal.pkg}
@@ -537,7 +496,6 @@ export default function InvestPage() {
         />
       )}
 
-      {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast && (
         <SuccessToast message={toast} onClose={() => setToast("")} />
       )}

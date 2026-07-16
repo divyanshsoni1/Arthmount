@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowUpRight, CheckCircle2, Clock, Loader2,
-  XCircle, Ban, AlertTriangle, BarChart3, Calendar, TrendingUp,
+  ArrowUpRight, CheckCircle2, Clock,
+  BarChart3,
 } from "lucide-react";
 import type { AdminWithdrawalStats } from "@/api-client/admin";
 
@@ -61,7 +61,6 @@ function StatCard({ label, count, amount, icon: Icon, gradient, glow, loading }:
       transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg
       ${gradient}
     `}>
-      {/* Glow orb */}
       <div className={`pointer-events-none absolute -right-5 -top-5 h-24 w-24 rounded-full ${glow} opacity-20 blur-xl transition-opacity group-hover:opacity-40`} />
       <div className="pointer-events-none absolute -bottom-6 -left-6 h-16 w-16 rounded-full bg-white/5" />
 
@@ -94,8 +93,8 @@ function StatCard({ label, count, amount, icon: Icon, gradient, glow, loading }:
 
 export function WithdrawalStatsCardsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-      {Array.from({ length: 8 }).map((_, i) => (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-[118px] animate-pulse rounded-2xl bg-slate-100" />
       ))}
     </div>
@@ -128,36 +127,12 @@ export function WithdrawalStatsCards({ stats, loading }: Props) {
       glow:     "bg-amber-400",
     },
     {
-      label:    "Processing",
-      count:    stats?.processing.count  ?? 0,
-      amount:   stats?.processing.amount ?? 0,
-      icon:     Loader2,
-      gradient: "bg-gradient-to-br from-violet-500 to-violet-700",
-      glow:     "bg-violet-400",
-    },
-    {
       label:    "Completed",
       count:    stats?.completed.count  ?? 0,
       amount:   stats?.completed.amount ?? 0,
       icon:     CheckCircle2,
       gradient: "bg-gradient-to-br from-emerald-500 to-emerald-700",
       glow:     "bg-emerald-400",
-    },
-    {
-      label:    "Rejected",
-      count:    stats?.rejected.count  ?? 0,
-      amount:   stats?.rejected.amount ?? 0,
-      icon:     XCircle,
-      gradient: "bg-gradient-to-br from-red-500 to-red-700",
-      glow:     "bg-red-400",
-    },
-    {
-      label:    "Cancelled",
-      count:    stats?.cancelled.count  ?? 0,
-      amount:   stats?.cancelled.amount ?? 0,
-      icon:     Ban,
-      gradient: "bg-gradient-to-br from-slate-400 to-slate-600",
-      glow:     "bg-slate-300",
     },
     {
       label:    "Today",
@@ -167,20 +142,12 @@ export function WithdrawalStatsCards({ stats, loading }: Props) {
       gradient: "bg-gradient-to-br from-blue-500 to-blue-700",
       glow:     "bg-blue-400",
     },
-    {
-      label:    "This Month",
-      count:    stats?.monthCount  ?? 0,
-      amount:   stats?.monthAmount ?? 0,
-      icon:     Calendar,
-      gradient: "bg-gradient-to-br from-teal-500 to-teal-700",
-      glow:     "bg-teal-400",
-    },
   ];
 
   if (loading) return <WithdrawalStatsCardsSkeleton />;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {cards.map((c) => (
         <StatCard key={c.label} {...c} loading={loading} />
       ))}

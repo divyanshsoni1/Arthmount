@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, RefreshCw, Download, LayoutGrid, List,
   TrendingUp, BarChart3, History, ChevronDown, ChevronUp,
-  FileText, Sparkles,
+  Sparkles,
 } from "lucide-react";
 
 import { useUser }            from "@/api-client/user";
@@ -189,7 +189,6 @@ export default function MyInvestmentsPage() {
   const [showAdvFilters,setShowAdvFilters] = useState(false);
   const [showCharts,    setShowCharts]    = useState(true);
   const [showCards,     setShowCards]     = useState(true);
-  const [showTable,     setShowTable]     = useState(true);
 
   // Auth guard
   useEffect(() => {
@@ -324,50 +323,6 @@ export default function MyInvestmentsPage() {
 
       {/* ── Page content ───────────────────────────────────────────────────── */}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-6">
-
-        {/* ── Hero strip ───────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f172a] to-slate-700 p-6 text-white shadow-lg">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-emerald-500/10" />
-          <div className="pointer-events-none absolute -left-6  bottom-0  h-28 w-28 rounded-full bg-white/5"  />
-          <div className="pointer-events-none absolute  right-28 bottom-3 h-20 w-20 rounded-full bg-blue-500/10" />
-          <div className="relative flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20">
-                  <BarChart3 size={15} className="text-emerald-400" />
-                </div>
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                  My Portfolio
-                </span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold leading-tight">
-                {user.name.split(" ")[0]}'s Investments
-              </h2>
-              <p className="text-sm text-white/60 mt-1.5 max-w-md">
-                A complete view of your investment portfolio — track performance, monitor lock-ins,
-                and analyze returns across all packages.
-              </p>
-            </div>
-
-            {/* Quick stats */}
-            {stats && (
-              <div className="flex flex-wrap gap-4">
-                {[
-                  { label: "Portfolio Value", value: formatINRCompact(stats.totalPortfolioValue), highlight: true },
-                  { label: "Total Profit",    value: `+${formatINRCompact(stats.totalProfit)}` },
-                  { label: "Active Plans",    value: String(stats.activeCount) },
-                ].map(({ label, value, highlight }) => (
-                  <div key={label}>
-                    <p className="text-[11px] text-white/40 uppercase tracking-wider">{label}</p>
-                    <p className={`text-xl font-extrabold tabular-nums mt-0.5 ${highlight ? "" : "text-emerald-400"}`}>
-                      {value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* ── Summary KPI cards ─────────────────────────────────────────────── */}
         {allLoading
@@ -534,30 +489,6 @@ export default function MyInvestmentsPage() {
                   />
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Full table section (always shown if investments exist) ────────── */}
-        {!isEmpty && !hasError && (
-          <div className="space-y-3">
-            <SectionHeader
-              title="Investment History"
-              subtitle="All investments with full details"
-              icon={FileText}
-              color="bg-gradient-to-br from-blue-500 to-indigo-600"
-              open={showTable}
-              onToggle={() => setShowTable((v) => !v)}
-            />
-            {showTable && (
-              <InvestmentsTable
-                investments={pageData?.investments ?? []}
-                loading={pageLoading}
-                totalCount={pageData?.total}
-                page={tablePage}
-                totalPages={pageData?.pages ?? 1}
-                onPageChange={setTablePage}
-              />
             )}
           </div>
         )}

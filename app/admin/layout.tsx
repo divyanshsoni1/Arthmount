@@ -9,7 +9,8 @@ import {
   Users, X, TrendingUp, Settings, Search, Activity,
   CircleDot, Package, ArrowUpRight,
 } from "lucide-react";
-import { useUser, useLogout } from "@/api-client/user";
+import { useUser, useLogout }  from "@/api-client/user";
+import MobileBottomNav        from "@/components/app-nav/MobileBottomNav";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -287,10 +288,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        {/*
+         * pb-[calc(4rem+env(safe-area-inset-bottom))] reserves space for the
+         * fixed MobileBottomNav on small screens. sm:pb-0 removes it on
+         * tablet/desktop where the sidebar is visible instead.
+         */}
+        <main className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom navigation — sm:hidden handled inside the component */}
+      <MobileBottomNav />
     </div>
   );
 }

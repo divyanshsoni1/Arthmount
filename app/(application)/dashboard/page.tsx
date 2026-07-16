@@ -4,11 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowDownLeft, ArrowRight, ArrowUpRight, BadgeCheck,
+  ArrowDownLeft, ArrowUpRight, BadgeCheck,
   ChevronLeft, ChevronRight, Clock, FileCheck,
   Plus, TrendingDown, TrendingUp, Wallet, BarChart3,
-  Activity, CircleDollarSign, Zap, Target, Star,
-  Calendar, RefreshCw,
+  Activity, CircleDollarSign, Zap, Target,
+  RefreshCw,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -401,29 +401,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Active Plans",        value: s?.activeInvestments    ?? 0, icon: TrendingUp,  color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Completed Plans",     value: s?.completedInvestments ?? 0, icon: BadgeCheck,  color: "text-blue-600",    bg: "bg-blue-50" },
-          { label: "Pending Withdrawals", value: s?.pendingWithdrawals   ?? 0, icon: Clock,       color: "text-amber-600",   bg: "bg-amber-50" },
-          { label: "Total Transactions",  value: s?.totalInvestments     ?? 0, icon: Activity,    color: "text-violet-600",  bg: "bg-violet-50" },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${bg}`}>
-              <Icon size={15} className={color} />
-            </div>
-            <div>
-              {loading
-                ? <div className="h-5 w-10 animate-pulse rounded bg-slate-100 mb-1" />
-                : <p className={`text-xl font-extrabold tabular-nums ${color}`}>{value}</p>
-              }
-              <p className="text-[11px] text-slate-500">{label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Chart + activity */}
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -458,65 +435,6 @@ export default function DashboardPage() {
 
       {/* Investment table */}
       <InvestmentTable />
-
-      {/* Recent deposits */}
-      {s && s.recentDeposits.length > 0 && (
-        <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-900">Recent Deposits</h3>
-            <Link href="/dashboard/wallet" className="flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:underline">
-              View all <ArrowRight size={11} />
-            </Link>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {s.recentDeposits.map((d) => (
-              <div key={d.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50/50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
-                    <ArrowDownLeft size={13} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">Wallet Recharge</p>
-                    <p className="text-[11px] text-slate-400">{fmtDate(d.depositedAt)} · {d.method}</p>
-                  </div>
-                </div>
-                <p className="text-sm font-bold text-emerald-600 tabular-nums">+{fmtINR(d.amount)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Upcoming maturity / tips strip */}
-      <div className="grid sm:grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
-            <Calendar size={15} className="text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-emerald-800">Upcoming Maturities</p>
-            <p className="text-[11px] text-emerald-600 mt-0.5">Check your investment plans for maturity dates.</p>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100">
-            <Star size={15} className="text-blue-600" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-blue-800">Refer & Earn</p>
-            <p className="text-[11px] text-blue-600 mt-0.5">Invite friends and earn commission on their investments.</p>
-          </div>
-        </div>
-        <div className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-4 flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100">
-            <Zap size={15} className="text-violet-600" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-violet-800">Power Tips</p>
-            <p className="text-[11px] text-violet-600 mt-0.5">Complete KYC to unlock higher investment limits.</p>
-          </div>
-        </div>
-      </div>
 
     </div>
   );
