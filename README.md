@@ -156,7 +156,7 @@ The application follows a modular full-stack architecture.
                                ▼
                     ┌─────────────────────┐
                     │    Next.js Backend  │
-                    │   API / Server Side  │
+                    │   API / Server Side │
                     └──────────┬──────────┘
                                │
               ┌────────────────┼────────────────┐
@@ -170,7 +170,7 @@ The application follows a modular full-stack architecture.
                                ▼
                     ┌─────────────────────┐
                     │   OTP Worker        │
-                    │ Async Background Job │
+                    │ Async Background Job│
                     └─────────────────────┘
 ```
 
