@@ -43,7 +43,7 @@ export default function OtpPage() {
   // renders an empty otpToken and the form submits a blank token on mount.
   const [ready,         setReady]         = useState(false);
 
-  const countdown   = useCountdown(30);
+  const countdown   = useCountdown(5 * 60); // 300 seconds — matches OTP validity period
   const inputRefs   = useRef<Array<HTMLInputElement | null>>([]);
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
 

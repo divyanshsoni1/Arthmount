@@ -161,7 +161,7 @@ export default function RegisterPage() {
   const [showPwd,     setShowPwd]     = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const countdown = useCountdown(30);
+  const countdown = useCountdown(5 * 60); // 300 seconds — matches OTP validity period
 
   // ── Step 1: name ──────────────────────────────────────────────────────────
 

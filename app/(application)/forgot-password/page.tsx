@@ -142,8 +142,8 @@ export default function ForgotPasswordPage() {
   const [showPwd,     setShowPwd]     = useState(false);
   const [showConf,    setShowConf]    = useState(false);
 
-  const phoneCountdown = useCountdown(30);
-  const emailCountdown = useCountdown(30);
+  const phoneCountdown = useCountdown(5 * 60); // 300 seconds — matches OTP validity period
+  const emailCountdown = useCountdown(5 * 60); // 300 seconds — matches OTP validity period
 
   // ── Step 1: phone ──────────────────────────────────────────────────────────
   const phoneForm = useForm<FpPhoneValues>({
